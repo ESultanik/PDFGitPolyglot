@@ -4,6 +4,8 @@ CXX=clang++
 AR=ar
 endif
 
+CURRENT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+
 .PHONY : all
 all : article_bundle.pdf
 
@@ -17,22 +19,23 @@ git-submodule :
 	git submodule init
 	git submodule update --recursive
 
-git/configure : git-submodule
+git/configure : | git-submodule
 	$(MAKE) -C git configure
 	cd git && ./configure
 
-.PHONY : build-git
-build-git : git/configure
+git/git : | git/configure
 	$(MAKE) CC=$(CC) CXX=$(CXX) AR=$(AR) -C git
 
 article.pdf : article.tex
 	pdflatex $<
 	pdflatex $<
 	test `wc -c <$@` -lt 65536 # The resulting PDF must be smaller than a DEFLATE block (0xFFFF bytes)!
+	@echo "$@ successfully created"
 
-article_bundle.pdf : article.pdf build-git
-	CURRENT_BRANCH=`git rev-parse --abbrev-ref HEAD`
+article_bundle.pdf : article.pdf git/git
+	echo Current branch: $(CURRENT_BRANCH)
 	git checkout -b PolyglotBranch
-	PDF_HASH=`git hash-object -w $@`
+	PATH=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))/git:$(PATH) git bundle create article.bundle --do-not-compress `git hash-object -w article.pdf` --all
+	mv article.bundle $@
 	git checkout $(CURRENT_BRANCH)
 	git branch -D PolyglotBranch
