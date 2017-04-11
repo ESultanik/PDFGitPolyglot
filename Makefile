@@ -34,8 +34,13 @@ article.pdf : article.tex
 
 article_bundle.pdf : article.pdf git/git
 	echo Current branch: $(CURRENT_BRANCH)
+	cp article.pdf $@
 	git checkout -b PolyglotBranch
-	PATH=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))/git:$(PATH) git bundle create article.bundle --do-not-compress `git hash-object -w article.pdf` --all
-	mv article.bundle $@
+	git update-index --add --cacheinfo 100644 `git hash-object -w $@` $@
+	$(eval TREE_HASH=$(shell git write-tree))
+	echo 'Polyglot PDF' | git commit-tree $(TREE_HASH)
+	git commit -a -m 'Creating the Polyglot'
+	PATH=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))/git:$(PATH) git bundle create article.bundle --do-not-compress `git hash-object $@` --all
 	git checkout $(CURRENT_BRANCH)
 	git branch -D PolyglotBranch
+	mv article.bundle $@
