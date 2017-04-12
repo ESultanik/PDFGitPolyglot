@@ -27,8 +27,6 @@ git/git : | git/configure
 article.pdf : article.tex
 	pdflatex $<
 	pdflatex $<
-	test `wc -c <$@` -lt 65536 # The resulting PDF must be smaller than a DEFLATE block (0xFFFF bytes)!
-	@echo "$@ successfully created"
 
 %_bundle.pdf : %.pdf git/git
 	./make_polyglot.sh $*.pdf $@

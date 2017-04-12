@@ -6,6 +6,10 @@ fi
 SOURCE=$1
 OUTPUT=$2
 
+if [ `wc -c <$SOURCE` -gt 65535 ]; then
+    (>&2 echo "Warning: $SOURCE is greater than 0xFFFF bytes. This might not work!")
+fi
+
 BRANCH_NAME=PolyglotBranch
 
 git ls-files $OUTPUT --error-unmatch 1>/dev/null 2>&1
