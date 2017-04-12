@@ -33,8 +33,10 @@ article.pdf : article.tex
 	@echo "$@ successfully created"
 
 article_bundle.pdf : article.pdf git/git
-	echo Current branch: $(CURRENT_BRANCH)
 	cp article.pdf $@
+	git stash save MAKINGPOLYGLOT
+	git stash list | grep -q MAKINGPOLYGLOT ; $(eval HAS_STASH=$$?)
+	echo "HAS STASH: $(HAS_STASH)"
 	git checkout -b PolyglotBranch
 	git update-index --add --cacheinfo 100644 `git hash-object -w $@` $@
 	$(eval TREE_HASH=$(shell git write-tree))
