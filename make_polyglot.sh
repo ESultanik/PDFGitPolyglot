@@ -35,17 +35,18 @@ if [ $HAS_STASH -eq 0 ]; then
 fi
 
 echo "Creating temporary branch ${BRANCH_NAME}..."
-git checkout -b $BRANCH_NAME
+git checkout -b $BRANCH_NAME 1>>${OUTPUT}.log 2>&1
 if [ $HAS_STASH -eq 0 ]; then
     echo "Applying the stash to the new branch..."
     git stash apply 1>>${OUTPUT}.log 2>&1
 fi
-git update-index --add --cacheinfo 100644 `git hash-object -w $OUTPUT` $OUTPUT
+echo "Making the polyglot..."
+git update-index --add --cacheinfo 100644 `git hash-object -w $OUTPUT` $OUTPUT 1>>${OUTPUT}.log 2>&1
 TREE_HASH=`git write-tree`
-echo 'Polyglot PDF' | git commit-tree $TREE_HASH
-git commit -a -m 'Creating the Polyglot'
+echo 'Polyglot PDF' | git commit-tree $TREE_HASH 1>>${OUTPUT}.log 2>&1
+git commit -a -m 'Creating the Polyglot' 1>>${OUTPUT}.log 2>&1
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PATH=$DIR:$PATH git bundle create ${OUTPUT}.bundle --do-not-compress `git hash-object $OUTPUT` --all
+PATH=$DIR/git:$PATH git bundle create ${OUTPUT}.bundle --do-not-compress `git hash-object $OUTPUT` --all 1>>${OUTPUT}.log 2>&1
 echo "Switching back to branch ${CURRENT_BRANCH}..."
 git checkout $CURRENT_BRANCH 1>>${OUTPUT}.log 2>&1
 echo "Deleting temporary branch ${BRANCH_NAME}..."
