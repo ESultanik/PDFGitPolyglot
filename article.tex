@@ -2,9 +2,12 @@
 
 \pdfminorversion=4
 
+\usepackage{tikz}
+\usetikzlibrary{fit}
+
 \begin{document}
 
-\title{This PDF is a Git Repo\\Containing its Own \LaTeX\ Source}
+\title{This PDF is a Git Repository\\Containing its Own \LaTeX\ Source}
 \author{Evan Sultanik}
 \date{April 11, 2017}
 
@@ -16,5 +19,22 @@ repository---into a single file. Git allows you to treat that file as
 if it were a standard Git database, so you can do things like clone a
 repo directly from it. Its purpose is to easily sneakernet pushes or
 even whole repositories across air gaps.
+
+The file format for Git bundles doesn't appear to be formally
+specified anywhere, however, inspecting \texttt{bundle.c} reveals that
+it's relatively straightforward:
+\begin{center}
+\begin{tikzpicture}
+  \node[text width=0.9\hsize] at (0,0) (sig) {\footnotesize\texttt{\# v2 git bundle}};
+  \node[inner sep=0mm,fit=(sig),draw,rounded corners,dashed,minimum width=0.9\hsize] (sigbox) {};
+  \node[draw,rounded corners,fill=white] at (sigbox.north) (siglabel) {\scriptsize Git Bundle Signature};
+  \node[text width=0.9\hsize,anchor=north west,yshift=-1mm] at (sig.south west) (b1) {\footnotesize\tt 3aa340a2e3d125ab6703e5c9bdfede2054a9c0c5 refs/heads/master};
+  \node[text width=0.9\hsize,anchor=north west,yshift=-1mm] at (b1.south west) (b2) {\footnotesize\tt 3aa340a2e3d125ab6703e5c9bdfede2054a9c0c5 refs/remotes/origin/master};
+  \node[text width=0.9\hsize,anchor=north west,yshift=-1mm] at (b2.south west) (b3) {\footnotesize\tt 4146cfe2fe9249fc14623f832587efe197ef5d2d refs/stash};
+  \node[text width=0.9\hsize,anchor=north west,yshift=-1mm] at (b3.south west) (b4) {\footnotesize\tt babdda4735ef164b7023be3545860d8b0bae250a HEAD};
+  \node[inner sep=0mm,fit=(b1) (b4),draw,rounded corners,dashed,minimum width=0.9\hsize] (digestbox) {};
+  \node[rotate=-90,draw,rounded corners,fill=white] at (digestbox.east) {\scriptsize Digest};
+\end{tikzpicture}
+\end{center}
 
 \end{document}
