@@ -89,6 +89,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
         pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
         for j in range(i,len(objects)):
             objects[j] = (objects[j][0] + len(new_obj), objects[j][1])
+    # TODO: Fix the xrefs!
     output.write(pdf_content)
 
 if __name__ == "__main__":
