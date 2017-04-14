@@ -28,5 +28,8 @@ article.pdf : article.tex
 	pdflatex $<
 	pdflatex $<
 
-%_bundle.pdf : %.pdf git/git
-	./make_polyglot.sh $*.pdf $@
+%_injected.pdf : %.pdf fix_oversize_pdf.py
+	python fix_oversize_pdf.py $*.pdf $@
+
+%_bundle.pdf : %_injected.pdf git/git
+	./make_polyglot.sh $*_injected.pdf $@
