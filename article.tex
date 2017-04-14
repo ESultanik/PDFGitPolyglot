@@ -39,15 +39,15 @@ specified anywhere, however, inspecting \texttt{bundle.c} reveals that
 it's relatively straightforward:
 \begin{center}
 \begin{tikzpicture}
-  \node[text width=0.8\hsize] at (0,0) (sig) {\texttt{\# v2 git bundle}};
+  \node[text width=0.8\hsize] at (0,0) (sig) {\footnotesize\texttt{\# v2 git bundle}};
   \node[inner sep=0mm,fit=(sig),draw,rounded corners,dashed,minimum width=0.8\hsize] (sigbox) {};
-  \node[draw,rounded corners,fill=white] at (sigbox.north) (siglabel) {Git Bundle Signature};
-  \node[text width=0.8\hsize,anchor=north west,yshift=-1mm] at (sig.south west) (b1) {\tt 3aa340a2e3d125ab6703e5c9bdfede2054a9c0c5 refs/heads/master};
+  \node[draw,rounded corners,fill=white] at (sigbox.north) (siglabel) {\footnotesize Git Bundle Signature};
+  \node[text width=0.8\hsize,anchor=north west,yshift=-1mm] at (sig.south west) (b1) {\scriptsize\tt 3aa340a2e3d125ab6703e5c9bdfede2054a9c0c5 refs/heads/master};
   \node[text width=0.8\hsize,anchor=north west,yshift=-1mm] at (b1.south west) (b2) {\tt 3aa340a2e3d125ab6703e5c9bdfede2054a9c0c5 refs/remotes/origin/master};
   \node[text width=0.8\hsize,anchor=north west,yshift=-1mm] at (b2.south west) (b3) {\tt 4146cfe2fe9249fc14623f832587efe197ef5d2d refs/stash};
   \node[text width=0.8\hsize,anchor=north west,yshift=-1mm] at (b3.south west) (b4) {\tt babdda4735ef164b7023be3545860d8b0bae250a HEAD};
   \node[inner sep=0mm,fit=(b1) (b4),draw,rounded corners,dashed,minimum width=0.8\hsize] (digestbox) {};
-  \node[rotate=-90,draw,rounded corners,fill=white] at (digestbox.east) {Digest};
+  \node[rotate=-90,draw,rounded corners,fill=white] at (digestbox.east) {\footnotesize Digest};
 \end{tikzpicture}
 \end{center}
 

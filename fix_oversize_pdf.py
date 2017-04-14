@@ -33,6 +33,22 @@ def parse_obj(pdf_content, logger = None):
             logger("Error: did not find end of PDF \"%s\"!\n" % line)
     return None, None
 
+DEFLATE_OBJ_START="%d 0 obj\n<<\n/Length 5\n>>\nstream\n"
+DEFLATE_OBJ_PRE_LEN=len(DEFLATE_OBJ_START) + 2
+DEFLATE_OBJ_END="endstream\nendobj\n"
+
+def calculate_deflate_locations(objects, additional_bytes = 0):
+    if not objects:
+        return []
+    length = additional_bytes
+    for i, obj in enumerate(objects):
+        # should we put a deflate header before object i?
+        start, l = obj
+        if length + l + DEFLATE_OBJ_PRE_LEN > 0xFFFF:
+            return [i] + map(lambda j : j+i, calculate_deflate_locations(objects[i:], additional_bytes = len(DEFLATE_OBJ_END)))
+        length += l
+    return []
+
 PDF_HEADER = r"%PDF-1.\d\s*\n%\xD0\xD4\xC5\xD8\s*\n"
 
 def fix_pdf(pdf_content, output = None, logger = None):
@@ -57,10 +73,23 @@ def fix_pdf(pdf_content, output = None, logger = None):
         if start is None:
             break
         objects.append((offset + start, length))
-        if length > 0xFFFF:
-            raise Exception("The object at PDF offset %d is more than 0xFFFF bytes! This PDF cannot be fixed.")
+        if length > 0xFFFF - DEFLATE_OBJ_PRE_LEN:
+            raise Exception("The object at PDF offset %d is more than %d bytes! This PDF cannot be fixed." % (0xFFFF - DEFLATE_OBJ_PRE_LEN))
         offset += start + length
-    logger("Parsed %d PDF objects." % len(objects))
+    logger("Parsed %d PDF objects.\n" % len(objects))
+    locations = calculate_deflate_locations(objects)
+    if not locations:
+        logger("The PDF doesn't need fixing!\n")
+        return
+    if len(locations) > 10:
+        raise Exception("Error: We currently only support up to 10 DEFLATE header objects! Edit fix_oversize_pdf.py to increase this amount.")
+    for idx, i in enumerate(locations):
+        logger("Inserting a DEFLATE header object before existing object #%d...\n" % (i+1))
+        new_obj = DEFLATE_OBJ_START % (9000+idx) + "XXXXX" + DEFLATE_OBJ_END
+        pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
+        for j in range(i,len(objects)):
+            objects[j] = (objects[j][0] + len(new_obj), objects[j][1])
+    output.write(pdf_content)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or len(sys.argv) > 3:
