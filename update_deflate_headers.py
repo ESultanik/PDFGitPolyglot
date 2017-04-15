@@ -64,6 +64,9 @@ def update_deflate_headers(pdf_content, output):
             if next_header_offset < 0:
                 raise Exception("Could not find the end of the PDF!")
             next_header_offset += len(PDF_END_MAGIC)
+        else:
+            new_length += 5 # Add the length of the DEFLATE header, since that was included in old_length    
+        assert i == 1 or pdf_content[previous_header_offset:previous_header_offset+5] == fix_oversize_pdf.DEFLATE_OBJ_PLACEHOLDER
         length = next_header_offset - previous_header_offset - 5
         if length > 0xFFFF:
             raise Exception("The length of DEFLATE block %d is 0x%x bytes, which is over the maximum of 0xFFFF!" % (i, length))
