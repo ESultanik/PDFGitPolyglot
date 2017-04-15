@@ -12,6 +12,17 @@ def read_deflate_header(header):
         raise Exception("Corrupt DEFLATE header!")
     return last, length
 
+def make_deflate_header(last, length):
+    header = ["\0"] * 5
+    if last:
+        header[0] = "\x01"
+    header[1] = chr(length & 0xFF)
+    header[2] = chr((length & 0xFF00) >> 8)
+    nlength = length ^ 0xFFFF
+    header[3] = chr(nlength & 0xFF)
+    header[4] = chr((nlength & 0xFF00) >> 8)    
+    return "".join(header)
+
 def update_deflate_headers(pdf_content, output):
     m = re.match(r"(.*?)" + fix_oversize_pdf.PDF_HEADER,pdf_content,re.MULTILINE | re.DOTALL)
     if not m:
@@ -35,6 +46,30 @@ def update_deflate_headers(pdf_content, output):
         pdf_content = pdf_content[:header_offset] + pdf_content[header_offset + 5:]
         print "Deleted DEFLATE header for a %d byte block at offset 0x%x" % (length, header_offset)
         header_offset += length
+    print "Updating the injected DEFLATE headers..."
+    previous_header_offset = pdf_header_offset - 5
+    last = False
+    i = 0
+    while not last:
+        i += 1
+        next_header_offset = pdf_content.find(fix_oversize_pdf.DEFLATE_OBJ_PLACEHOLDER, previous_header_offset+5)
+        if next_header_offset < 0:
+            last = True
+            # Find the end of the PDF:
+            PDF_END_MAGIC = "%%EOF\x0A"
+            next_header_offset = pdf_content.find(PDF_END_MAGIC, previous_header_offset+5)
+            if next_header_offset < 0:
+                raise Exception("Could not find the end of the PDF!")
+            next_header_offset += len(PDF_END_MAGIC)
+        length = next_header_offset - previous_header_offset - 5
+        if length > 0xFFFF:
+            raise Exception("The length of DEFLATE block %d is 0x%x bytes, which is over the maximum of 0xFFFF!" % (i, length))
+        pdf_content = pdf_content[:previous_header_offset] + make_deflate_header(last, length) + pdf_content[previous_header_offset+5:]
+        print "END: %s" % " ".join(map(hex, map(ord, pdf_content[previous_header_offset+length:previous_header_offset+5+length])))
+        previous_header_offset = next_header_offset
+        print "DEFLATE block header %d%s set to length %d" % (i, [""," (last)"][last], length)
+    out.write(pdf_content)
+    out.flush()
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

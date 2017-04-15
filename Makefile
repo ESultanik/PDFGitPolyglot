@@ -32,4 +32,6 @@ article.pdf : article.tex
 	python fix_oversize_pdf.py $*.pdf $@
 
 %_bundle.pdf : %_injected.pdf git/git
-	./make_polyglot.sh $*_injected.pdf $@
+	./make_polyglot.sh $*_injected.pdf $@.polyglot
+	./update_deflate_headers.py $@.polyglot $@
+	rm $@.polyglot
