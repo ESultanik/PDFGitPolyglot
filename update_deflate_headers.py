@@ -65,7 +65,6 @@ def update_deflate_headers(pdf_content, output):
         if length > 0xFFFF:
             raise Exception("The length of DEFLATE block %d is 0x%x bytes, which is over the maximum of 0xFFFF!" % (i, length))
         pdf_content = pdf_content[:previous_header_offset] + make_deflate_header(last, length) + pdf_content[previous_header_offset+5:]
-        print "END: %s" % " ".join(map(hex, map(ord, pdf_content[previous_header_offset+length:previous_header_offset+5+length])))
         previous_header_offset = next_header_offset
         print "DEFLATE block header %d%s set to length %d" % (i, [""," (last)"][last], length)
     out.write(pdf_content)
