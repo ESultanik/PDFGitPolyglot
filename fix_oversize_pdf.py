@@ -36,6 +36,7 @@ def parse_obj(pdf_content, logger = None):
 DEFLATE_OBJ_START="%d 0 obj\n<<\n/Length 5\n>>\nstream\n"
 DEFLATE_OBJ_PRE_LEN=len(DEFLATE_OBJ_START) + 2
 DEFLATE_OBJ_END="endstream\nendobj\n"
+DEFLATE_OBJ_PLACEHOLDER="\x0E\x0F\x10\x11\x12"
 
 def calculate_deflate_locations(objects, additional_bytes = 0):
     if not objects:
@@ -67,6 +68,9 @@ def fix_pdf(pdf_content, output = None, logger = None):
             break
     if start_offset is None:
         raise Exception("Did not find PDF header!")
+    # Make sure that the DEFLATE object placeholder byte sequence doesn't exist in the PDF anywhere:
+    if DEFLATE_OBJ_PLACEHOLDER in pdf_content[offset:]:
+        raise Exception("Error: The PDF already contains the placeholder DEFLATE byte sequence! To fix this, change DEFLATE_OBJ_PLACEHOLDER in fix_oversize_pdf.py")
     objects = []
     while True:
         start, length = parse_obj(pdf_content[offset:], logger = logger)
@@ -85,7 +89,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
         raise Exception("Error: We currently only support up to 10 DEFLATE header objects! Edit fix_oversize_pdf.py to increase this amount.")
     for idx, i in enumerate(locations):
         logger("Inserting a DEFLATE header object before existing object #%d...\n" % (i+1))
-        new_obj = DEFLATE_OBJ_START % (9000+idx) + "XXXXX" + DEFLATE_OBJ_END
+        new_obj = DEFLATE_OBJ_START % (9000+idx) + DEFLATE_OBJ_PLACEHOLDER + DEFLATE_OBJ_END
         pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
         for j in range(i,len(objects)):
             objects[j] = (objects[j][0] + len(new_obj), objects[j][1])
