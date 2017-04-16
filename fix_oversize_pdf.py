@@ -33,6 +33,17 @@ def parse_obj(pdf_content, logger = None):
             logger("Error: did not find end of PDF \"%s\"!\n" % line)
     return None, None
 
+def make_deflate_header(last, length):
+    header = ["\0"] * 5
+    if last:
+        header[0] = "\x01"
+    header[1] = chr(length & 0xFF)
+    header[2] = chr((length & 0xFF00) >> 8)
+    nlength = length ^ 0xFFFF
+    header[3] = chr(nlength & 0xFF)
+    header[4] = chr((nlength & 0xFF00) >> 8)    
+    return "".join(header)
+
 DEFLATE_OBJ_START="%d 0 obj\n<<\n/Length 5\n>>\nstream\n"
 DEFLATE_OBJ_PRE_LEN=len(DEFLATE_OBJ_START) + 2
 DEFLATE_OBJ_END="endstream\nendobj\n"
@@ -68,9 +79,6 @@ def fix_pdf(pdf_content, output = None, logger = None):
             break
     if start_offset is None:
         raise Exception("Did not find PDF header!")
-    # Make sure that the DEFLATE object placeholder byte sequence doesn't exist in the PDF anywhere:
-    if DEFLATE_OBJ_PLACEHOLDER in pdf_content[offset:]:
-        raise Exception("Error: The PDF already contains the placeholder DEFLATE byte sequence! To fix this, change DEFLATE_OBJ_PLACEHOLDER in fix_oversize_pdf.py")
     objects = []
     while True:
         start, length = parse_obj(pdf_content[offset:], logger = logger)
@@ -82,19 +90,29 @@ def fix_pdf(pdf_content, output = None, logger = None):
         offset += start + length
     logger("Parsed %d PDF objects.\n" % len(objects))
     locations = calculate_deflate_locations(objects)
+    first_block_size = 0
     if not locations:
         logger("The PDF doesn't need fixing!\n")
-        return
+        return first_block_size
     if len(locations) > 10:
         raise Exception("Error: We currently only support up to 10 DEFLATE header objects! Edit fix_oversize_pdf.py to increase this amount.")
     for idx, i in enumerate(locations):
-        logger("Inserting a DEFLATE header object before existing object #%d...\n" % (i+1))
-        new_obj = DEFLATE_OBJ_START % (9000+idx) + DEFLATE_OBJ_PLACEHOLDER + DEFLATE_OBJ_END
+        if i >= len(locations) - 1:
+            last = True
+            length = len(pdf_content[objects[i][0]:])
+        else:
+            last = False
+            length = objects[i+1][0] - objects[i][0]
+        if idx == 0:
+            first_block_size = length
+        logger("Inserting %s DEFLATE header object for a %d byte block before existing object #%d...\n" % (["a", "the last"][last], length, i+1))
+        new_obj = DEFLATE_OBJ_START % (9000+idx) + make_deflate_header(last, length) + DEFLATE_OBJ_END
         pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
         for j in range(i,len(objects)):
             objects[j] = (objects[j][0] + len(new_obj), objects[j][1])
     # TODO: Fix the xrefs!
     output.write(pdf_content)
+    return first_block_size
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or len(sys.argv) > 3:
@@ -113,7 +131,9 @@ if __name__ == "__main__":
             if len(sys.argv) > 2:
                 out = open(sys.argv[2], 'wb')
                 kwargs["output"] = out
-            fix_pdf(content, **kwargs)
+            first_block_size = fix_pdf(content, **kwargs)
+            with open(sys.argv[1] + ".first_block_bytes", 'w') as l:
+                l.write("%d" % first_block_size)
         finally:
             if out is not None:
                 out.close()

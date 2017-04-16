@@ -28,10 +28,10 @@ article.pdf : article.tex
 	pdflatex $<
 	pdflatex $<
 
-%_injected.pdf : %.pdf fix_oversize_pdf.py
+%_injected.pdf %.pdf.first_block_bytes : %.pdf fix_oversize_pdf.py
 	python fix_oversize_pdf.py $*.pdf $@
 
-%_bundle.pdf : %_injected.pdf git/git
+%_bundle.pdf : %_injected.pdf %.pdf.first_block_bytes git/git
 	./make_polyglot.sh $*_injected.pdf $@.polyglot
-	./update_deflate_headers.py $@.polyglot $@
+	./update_deflate_headers.py $@.polyglot $@ `cat $*.pdf.first_block_bytes`
 	rm $@.polyglot

@@ -12,18 +12,7 @@ def read_deflate_header(header):
         raise Exception("Corrupt DEFLATE header!")
     return last, length
 
-def make_deflate_header(last, length):
-    header = ["\0"] * 5
-    if last:
-        header[0] = "\x01"
-    header[1] = chr(length & 0xFF)
-    header[2] = chr((length & 0xFF00) >> 8)
-    nlength = length ^ 0xFFFF
-    header[3] = chr(nlength & 0xFF)
-    header[4] = chr((nlength & 0xFF00) >> 8)    
-    return "".join(header)
-
-def update_deflate_headers(pdf_content, output):
+def update_deflate_headers(pdf_content, output, first_block_size):
     m = re.match(r"(.*?)" + fix_oversize_pdf.PDF_HEADER,pdf_content,re.MULTILINE | re.DOTALL)
     if not m:
         raise Exception("Could not find PDF header!")
@@ -34,7 +23,6 @@ def update_deflate_headers(pdf_content, output):
     if last:
         print "The entire PDF fits in a single DEFLATE block; nothing needed!"
         return
-    old_length = length
     print "Deleting the unwanted DEFLATE headers..."
     header_offset = pdf_header_offset + length
     while not last:
@@ -44,46 +32,19 @@ def update_deflate_headers(pdf_content, output):
         except Exception as e:
             print " ".join(map(hex, map(ord, pdf_content[header_offset-5:header_offset+10])))
             raise e
-        old_length += length
         pdf_content = pdf_content[:header_offset] + pdf_content[header_offset + 5:]
         print "Deleted DEFLATE header for a %d byte block at offset 0x%x" % (length, header_offset)
         header_offset += length
-    print "Updating the injected DEFLATE headers..."
-    previous_header_offset = pdf_header_offset - 5
-    last = False
-    i = 0
-    new_length = 0
-    while not last:
-        i += 1
-        next_header_offset = pdf_content.find(fix_oversize_pdf.DEFLATE_OBJ_PLACEHOLDER, previous_header_offset+5)
-        if next_header_offset < 0:
-            last = True
-            # Find the end of the PDF:
-            PDF_END_MAGIC = "%%EOF\x0A"
-            next_header_offset = pdf_content.find(PDF_END_MAGIC, previous_header_offset+5)
-            if next_header_offset < 0:
-                raise Exception("Could not find the end of the PDF!")
-            next_header_offset += len(PDF_END_MAGIC)
-        else:
-            new_length += 5 # Add the length of the DEFLATE header, since that was included in old_length    
-        assert i == 1 or pdf_content[previous_header_offset:previous_header_offset+5] == fix_oversize_pdf.DEFLATE_OBJ_PLACEHOLDER
-        length = next_header_offset - previous_header_offset - 5
-        if length > 0xFFFF:
-            raise Exception("The length of DEFLATE block %d is 0x%x bytes, which is over the maximum of 0xFFFF!" % (i, length))
-        new_length += length
-        pdf_content = pdf_content[:previous_header_offset] + make_deflate_header(last, length) + pdf_content[previous_header_offset+5:]
-        previous_header_offset = next_header_offset
-        print "DEFLATE block header %d%s set to length %d" % (i, [""," (last)"][last], length)
-    if new_length != old_length:
-        raise Exception("The new length is %d bytes, but the old length was %d. This should never happen!" % (new_length, old_length))
+    print "Updating the first DEFLATE header..."
+    pdf_content = pdf_content[:pdf_header_offset] + fix_oversize_pdf.make_deflate_header(False, first_block_size) + pdf_content[pdf_header_offset+5:]
     out.write(pdf_content)
     out.flush()
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        sys.stderr.write("Usage: %s PATH_TO_PDF OUTPUT_FILE\n\n" % sys.argv[0])
+    if len(sys.argv) != 4:
+        sys.stderr.write("Usage: %s PATH_TO_PDF OUTPUT_FILE FIRST_BLOCK_BYTES\n\n" % sys.argv[0])
         exit(1)
 
     with open(sys.argv[1], 'rb') as f:
         with open(sys.argv[2], 'wb') as out:
-            update_deflate_headers(f.read(), out)
+            update_deflate_headers(f.read(), out, int(sys.argv[3]))
