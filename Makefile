@@ -33,6 +33,6 @@ article.pdf : article.tex
 
 %_bundle.pdf : %_injected.pdf %.pdf.block_offsets git/git update_deflate_headers.py
 	./make_polyglot.sh $*_injected.pdf $@
-	mv $@ $@.polygot
+	mv $@ $@.polyglot
 	./update_deflate_headers.py $@.polyglot $@ $*.pdf.block_offsets
-	rm $@.polygot
+	rm $@.polyglot
