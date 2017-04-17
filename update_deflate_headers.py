@@ -44,15 +44,15 @@ def update_deflate_headers(pdf_content, output, block_offsets):
             print " ".join(map(hex, map(ord, pdf_content[header_offset-5:header_offset+10])))
             raise e
         pdf_content = pdf_content[:header_offset] + pdf_content[header_offset + 5:]
-        print "Deleted DEFLATE header for a %d byte block at offset 0x%x" % (length, header_offset)
+        print "Deleted DEFLATE header at offset 0x%x for a %d byte block" % (header_offset, length)
         header_offset += length 
     print "Updating the first DEFLATE header..."
     pdf_content = pdf_content[:pdf_header_offset + block_offsets[0][0]] + make_deflate_header(False, block_offsets[0][1]) + pdf_content[pdf_header_offset:]
     print "Updating the injected DEFLATE headers..."
     for idx, block in enumerate(block_offsets[1:]):
-        last = (idx == len(block_offsets) - 1)
+        last = (idx == len(block_offsets) - 2)
         offset, length = block
-        print "Injecting DEFLATE header at offset %d for a block of length %d" % (pdf_header_offset + offset, length)
+        print "Injecting DEFLATE header at offset 0x%x for a %d byte block" % (pdf_header_offset + offset, length)
         pdf_content = pdf_content[:pdf_header_offset + offset] + make_deflate_header(last, length) + pdf_content[pdf_header_offset + offset:]
     out.write(pdf_content)
     out.flush()

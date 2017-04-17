@@ -95,10 +95,8 @@ def fix_pdf(pdf_content, output = None, logger = None):
     if not locations:
         logger("The PDF doesn't need fixing!\n")
         return block_offsets
-    if len(locations) > 10:
-        raise Exception("Error: We currently only support up to 10 DEFLATE header objects! Edit fix_oversize_pdf.py to increase this amount.")
     for idx, i in enumerate(locations):
-        if i >= len(locations) - 1:
+        if idx >= len(locations) - 1:
             last = True
             length = len(pdf_content[objects[i][0]:])
         else:
@@ -108,12 +106,12 @@ def fix_pdf(pdf_content, output = None, logger = None):
         extra_bytes = bytes_to_inject(length)
         length += extra_bytes
         if idx == 0:
-            block_offsets[0][1] = objects[i][0]
-        block_offsets.append([objects[i][0] + 5*idx, length]) # 5*idx is to account for the previously added 5-byte DEFLATE block headers
+            block_offsets[0][1] = objects[i][0] + 3 # +3 for the leading '%% '
+        block_offsets.append([objects[i][0] + 5*idx + 3, length]) # 5*idx is to account for the previously added 5-byte DEFLATE block headers, +3 for the leading '%% '
         logger("Inserting %s DEFLATE header comment for a %d byte block with %d extra bytes before existing object #%d...\n" % (["a", "the last"][last], length - extra_bytes, extra_bytes, i+1))
         new_obj = "%%%% %s\n" % (' ' * extra_bytes)
         pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
-        for j in range(i+1,len(objects)):
+        for j in range(i,len(objects)):
             objects[j] = (objects[j][0] + len(new_obj), objects[j][1])
     # TODO: Fix the xrefs!
     output.write(pdf_content)
