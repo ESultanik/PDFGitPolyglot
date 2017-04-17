@@ -33,21 +33,9 @@ def parse_obj(pdf_content, logger = None):
             logger("Error: did not find end of PDF \"%s\"!\n" % line)
     return None, None
 
-def make_deflate_header(last, length):
-    header = ["\0"] * 5
-    if last:
-        header[0] = "\x01"
-    header[1] = chr(length & 0xFF)
-    header[2] = chr((length & 0xFF00) >> 8)
-    nlength = length ^ 0xFFFF
-    header[3] = chr(nlength & 0xFF)
-    header[4] = chr((nlength & 0xFF00) >> 8)    
-    return "".join(header)
-
 DEFLATE_OBJ_START="%d 0 obj\n<<\n/Length 5\n>>\nstream\n"
 DEFLATE_OBJ_PRE_LEN=len(DEFLATE_OBJ_START) + 2
 DEFLATE_OBJ_END="endstream\nendobj\n"
-DEFLATE_OBJ_PLACEHOLDER="\x0E\x0F\x10\x11\x12"
 
 def calculate_deflate_locations(objects, additional_bytes = 0):
     if not objects:
@@ -106,7 +94,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
         if idx == 0:
             first_block_size = length
         logger("Inserting %s DEFLATE header object for a %d byte block before existing object #%d...\n" % (["a", "the last"][last], length, i+1))
-        new_obj = DEFLATE_OBJ_START % (9000+idx) + make_deflate_header(last, length) + DEFLATE_OBJ_END
+        new_obj = DEFLATE_OBJ_START % (9000+idx) + DEFLATE_OBJ_END
         pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
         for j in range(i,len(objects)):
             objects[j] = (objects[j][0] + len(new_obj), objects[j][1])
@@ -131,9 +119,9 @@ if __name__ == "__main__":
             if len(sys.argv) > 2:
                 out = open(sys.argv[2], 'wb')
                 kwargs["output"] = out
-            first_block_size = fix_pdf(content, **kwargs)
-            with open(sys.argv[1] + ".first_block_bytes", 'w') as l:
-                l.write("%d" % first_block_size)
+            blocks = fix_pdf(content, **kwargs)
+            with open(sys.argv[1] + ".block_offsets", 'w') as l:
+                l.write(" ".join(blocks))
         finally:
             if out is not None:
                 out.close()

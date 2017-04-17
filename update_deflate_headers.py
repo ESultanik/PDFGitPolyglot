@@ -10,7 +10,18 @@ def read_deflate_header(header):
     nlength = (ord(header[4]) << 8) + ord(header[3])
     if nlength ^ 0xFFFF != length:
         raise Exception("Corrupt DEFLATE header!")
-    return last, length
+    return last, Length
+
+def make_deflate_header(last, length):
+    header = ["\0"] * 5
+    if last:
+        header[0] = "\x01"
+    header[1] = chr(length & 0xFF)
+    header[2] = chr((length & 0xFF00) >> 8)
+    nlength = length ^ 0xFFFF
+    header[3] = chr(nlength & 0xFF)
+    header[4] = chr((nlength & 0xFF00) >> 8)    
+    return "".join(header)
 
 def update_deflate_headers(pdf_content, output, first_block_size):
     m = re.match(r"(.*?)" + fix_oversize_pdf.PDF_HEADER,pdf_content,re.MULTILINE | re.DOTALL)
