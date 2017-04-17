@@ -3,6 +3,7 @@
 import fix_oversize_pdf
 import re
 import sys
+import zlib
 
 def read_deflate_header(header):
     last = bool(0b1 & ord(header[0]))
@@ -29,6 +30,7 @@ def update_deflate_headers(pdf_content, output, block_offsets):
         raise Exception("Could not find PDF header!")
     pdf_header_offset = len(m.group(1))
     print "Found PDF header at offset %d" % pdf_header_offset
+    content_before = zlib.decompress(pdf_content[pdf_header_offset - 7:])
     deflate_header = pdf_content[:pdf_header_offset][-5:]
     last, length = read_deflate_header(deflate_header)
     if last:
@@ -54,6 +56,10 @@ def update_deflate_headers(pdf_content, output, block_offsets):
         offset, length = block
         print "Injecting DEFLATE header at offset 0x%x for a %d byte block" % (pdf_header_offset + offset, length)
         pdf_content = pdf_content[:pdf_header_offset + offset] + make_deflate_header(last, length) + pdf_content[pdf_header_offset + offset:]
+    content_after = zlib.decompress(pdf_content[pdf_header_offset - 7:])
+    print "Validating the resulting DEFLATE headers..."
+    if content_before != content_after:
+        raise Exception("Error: the updated DEFLATE output is corrupt!")
     out.write(pdf_content)
     out.flush()
 
