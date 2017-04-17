@@ -31,7 +31,7 @@ article.pdf : article.tex
 %_injected.pdf %.pdf.block_offsets : %.pdf fix_oversize_pdf.py
 	python fix_oversize_pdf.py $*.pdf $@
 
-%_bundle.pdf : %_injected.pdf %.pdf.block_offsets git/git
+%_bundle.pdf : %_injected.pdf %.pdf.block_offsets git/git update_deflate_headers.py
 	./make_polyglot.sh $*_injected.pdf $@
 	mv $@ $@.polygot
 	./update_deflate_headers.py $@.polyglot $@ $*.pdf.block_offsets
