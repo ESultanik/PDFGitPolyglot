@@ -36,15 +36,20 @@ def parse_pack_object(data):
     compressed_length = len(data) - header_bytes - len(d.unused_data)
     return header_bytes, obj_type, length, compressed_length, decompressed
 
-def fix_pack_sha1(pdf_content, pdf_header_offset):
+def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
     pack_offset = pdf_content.rindex("PACK", 0, pdf_header_offset)
     version, num_objects = struct.unpack("!II", pdf_content[pack_offset + 4:pack_offset + 12])
     print "Found git pack version %d containing %d objects" % (version, num_objects)
-    offset = pack_offset + 12
+    start_offset = pack_offset + 12
+    offset = start_offset
     for i in range(num_objects):
         #print "Offset: 0x%x" % offset
         header_bytes, obj_type, decompressed_length, compressed_length, decompressed = parse_pack_object(pdf_content[offset:])
         #print "Parsed pack object at offset 0x%x of type %d with a %d byte header, %d byte body (decompressed), and %d byte body (compressed)" % (offset, obj_type, header_bytes, decompressed_length, compressed_length)
+        #if fix and offset + header_bytes + 2 == pdf_header_offset - 5:
+        #    # This is the object containing the PDF, so move it to the front, while we're at it.
+        #    print "Moving the PDF object to the front of the pack..."
+        #    pdf_content = pdf_content[:start_offset] + pdf_content[offset:offset + header_bytes + compressed_length] + pdf_content[start_offset:offset] + pdf_content[offset + header_bytes + compressed_length:]
         offset += header_bytes + compressed_length
     print "SHA1 should be at offset 0x%x" % offset
     sha1 = hashlib.sha1(pdf_content[pack_offset:offset])
@@ -52,8 +57,10 @@ def fix_pack_sha1(pdf_content, pdf_header_offset):
     if sha1.digest() == pdf_content[offset:offset+20]:
         print "SHA1 is valid!"
     else:
-        print "SHA1 is not valid! Repairing it..."
-        pdf_content = pdf_content[:offset] + sha1.digest() + pdf_content[offset+20:]
+        print "SHA1 is not valid!"
+        if fix:
+            print "Repairing the SHA1..."
+            pdf_content = pdf_content[:offset] + sha1.digest() + pdf_content[offset+20:]
     return pdf_content
     
 def read_deflate_header(header):
@@ -113,7 +120,7 @@ def update_deflate_headers(pdf_content, output, block_offsets):
     print "Validating the resulting DEFLATE headers..."
     if content_before != content_after:
         raise Exception("Error: the updated DEFLATE output is corrupt!")
-    pdf_content = fix_pack_sha1(pdf_content, pdf_header_offset)
+    pdf_content = fix_pack_sha1(pdf_content, pdf_header_offset, fix = True)
     out.write(pdf_content)
     out.flush()
 
