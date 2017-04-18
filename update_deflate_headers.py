@@ -66,6 +66,7 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
     offset = start_offset
     bytes_since_pdf = None
     pdf_length = None
+    offset_delta = 0
     for i in range(num_objects):
         #print "Offset: 0x%x" % offset
         obj = parse_pack_object(pdf_content[offset:])
@@ -76,13 +77,14 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
                     # we need to update the offset to account for the fact that the PDF was moved:
                     print "Updating offset delta object #%d from pointing %d bytes back to instead point %d bytes back..." % (i+1, obj.reference, obj.reference - pdf_length)
                     new_reference = []
-                    remaining_value = obj.reference - pdf_length
+                    remaining_value = obj.reference - pdf_length + offset_delta
                     while remaining_value > 0:
                         new_reference.append((remaining_value & 0b1111111) | 0b10000000)
                         remaining_value >>= 7
                     new_reference[-1] &= 0b01111111
                     length_before = len(pdf_content)
                     pdf_content = pdf_content[:offset + obj.reference_header_offset] + "".join(map(chr, new_reference)) + pdf_content[offset + obj.header_bytes:]
+                    offset_delta += len(new_reference) - obj.reference_header_length
                     # Sanity check:
                     assert length_before == len(pdf_content) + len(new_reference) - obj.reference_header_length
                     obj = parse_pack_object(pdf_content[offset:])
