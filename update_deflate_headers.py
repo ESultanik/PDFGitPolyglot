@@ -7,10 +7,19 @@ import struct
 import sys
 import zlib
 
+OBJ_OFS_DELTA=6
+OBJ_REF_DELTA=7
+
+class PackObject(object):
+    def __init__(self, **kwargs):
+        for k, v in kwargs.iteritems():
+            setattr(self, k, v)
+
 def parse_pack_object(data):
     obj_type = None
     length = 0
     header_bytes = 0
+    kwargs = {}
     for c in map(ord, data):
         if obj_type is None:
             # This is the first byte
@@ -21,20 +30,29 @@ def parse_pack_object(data):
         header_bytes += 1
         if not (c & 0b10000000):
             break # This was the last byte
-    if obj_type == 7:
-        # OBJ_REF_DELTA
+    if obj_type == OBJ_REF_DELTA:
         header_bytes += 20
-    elif obj_type == 6:
-        # OBJ_OFS_DELTA
-        for c in map(ord, data[header_bytes:]):
+    elif obj_type == OBJ_OFS_DELTA:
+        reference = 0
+        reference_offset = header_bytes
+        for i, c in enumerate(map(ord, data[header_bytes:])):
             header_bytes += 1
+            reference += (c & 0b01111111) << (i * 7)
             if not (c & 0b10000000):
                 break
+        kwargs["reference"] = reference
+        kwargs["reference_header_offset"] = reference_offset
+        kwargs["reference_header_length"] = header_bytes - reference_offset
     d = zlib.decompressobj()
     decompressed = d.decompress(data[header_bytes:], length)
     assert len(decompressed) == length
     compressed_length = len(data) - header_bytes - len(d.unused_data)
-    return header_bytes, obj_type, length, compressed_length, decompressed
+    kwargs["header_bytes"] = header_bytes
+    kwargs["obj_type"] = obj_type
+    kwargs["decompressed_length"] = length
+    kwargs["compressed_length"] = compressed_length
+    kwargs["decompressed"] = decompressed
+    return PackObject(**kwargs)
 
 def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
     pack_offset = pdf_content.rindex("PACK", 0, pdf_header_offset)
@@ -42,15 +60,35 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
     print "Found git pack version %d containing %d objects" % (version, num_objects)
     start_offset = pack_offset + 12
     offset = start_offset
+    bytes_since_pdf = None
+    pdf_length = None
     for i in range(num_objects):
         #print "Offset: 0x%x" % offset
-        header_bytes, obj_type, decompressed_length, compressed_length, decompressed = parse_pack_object(pdf_content[offset:])
+        obj = parse_pack_object(pdf_content[offset:])
         #print "Parsed pack object at offset 0x%x of type %d with a %d byte header, %d byte body (decompressed), and %d byte body (compressed)" % (offset, obj_type, header_bytes, decompressed_length, compressed_length)
-        #if fix and offset + header_bytes + 2 == pdf_header_offset - 5:
-        #    # This is the object containing the PDF, so move it to the front, while we're at it.
-        #    print "Moving the PDF object to the front of the pack..."
-        #    pdf_content = pdf_content[:start_offset] + pdf_content[offset:offset + header_bytes + compressed_length] + pdf_content[start_offset:offset] + pdf_content[offset + header_bytes + compressed_length:]
-        offset += header_bytes + compressed_length
+        if fix:
+            if bytes_since_pdf is not None and obj.obj_type == OBJ_OFS_DELTA:
+                if obj.reference > bytes_since_pdf:
+                    # we need to update the offset to account for the fact that the PDF was moved:
+                    print "Updating offset delta object #%d pointing %d bytes back to instead point %d bytes back..." % (i+1, obj.reference, obj.reference - pdf_length)
+                    new_reference = []
+                    remaining_value = obj.reference - pdf_length
+                    while remaining_value > 0:
+                        new_reference.append(remaining_value & 0b1111111)
+                        remaining_value >>= 7
+                    new_reference[-1] |= 0b10000000
+                    pdf_content = pdf_content[:offset + obj.reference_header_offset] + "".join(map(chr, new_reference)) + pdf_content[offset + obj.reference_header_offset + obj.reference_header_length:]
+                    obj = parse_pack_object(pdf_content[offset:])
+            if offset + obj.header_bytes + 2 == pdf_header_offset - 5:
+                # This is the object containing the PDF, so move it to the front, while we're at it.
+                print "The PDF is contained within pack object %d" % (i+1)
+                print "Moving the PDF object to the front of the pack..."
+                pdf_content = pdf_content[:start_offset] + pdf_content[offset:offset + obj.header_bytes + obj.compressed_length] + pdf_content[start_offset:offset] + pdf_content[offset + obj.header_bytes + obj.compressed_length:]
+                pdf_length = obj.header_bytes + obj.compressed_length
+                bytes_since_pdf = pdf_length
+            elif bytes_since_pdf is not None:
+                bytes_since_pdf += obj.header_bytes + obj.compressed_length
+        offset += obj.header_bytes + obj.compressed_length
     print "SHA1 should be at offset 0x%x" % offset
     sha1 = hashlib.sha1(pdf_content[pack_offset:offset])
     print sha1.hexdigest()
