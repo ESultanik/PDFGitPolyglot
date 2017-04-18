@@ -44,7 +44,11 @@ def parse_pack_object(data):
         kwargs["reference_header_offset"] = reference_offset
         kwargs["reference_header_length"] = header_bytes - reference_offset
     d = zlib.decompressobj()
-    decompressed = d.decompress(data[header_bytes:], length)
+    try:
+        decompressed = d.decompress(data[header_bytes:], length)
+    except zlib.error as e:
+        sys.stderr.write("Error decompressing pack object of type %d, decompressed length %d, and %d header bytes!\n" % (obj_type, length, header_bytes))
+        raise e
     assert len(decompressed) == length
     compressed_length = len(data) - header_bytes - len(d.unused_data)
     kwargs["header_bytes"] = header_bytes
@@ -70,14 +74,17 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
             if bytes_since_pdf is not None and obj.obj_type == OBJ_OFS_DELTA:
                 if obj.reference > bytes_since_pdf:
                     # we need to update the offset to account for the fact that the PDF was moved:
-                    print "Updating offset delta object #%d pointing %d bytes back to instead point %d bytes back..." % (i+1, obj.reference, obj.reference - pdf_length)
+                    print "Updating offset delta object #%d from pointing %d bytes back to instead point %d bytes back..." % (i+1, obj.reference, obj.reference - pdf_length)
                     new_reference = []
                     remaining_value = obj.reference - pdf_length
                     while remaining_value > 0:
-                        new_reference.append(remaining_value & 0b1111111)
+                        new_reference.append((remaining_value & 0b1111111) | 0b10000000)
                         remaining_value >>= 7
-                    new_reference[-1] |= 0b10000000
-                    pdf_content = pdf_content[:offset + obj.reference_header_offset] + "".join(map(chr, new_reference)) + pdf_content[offset + obj.reference_header_offset + obj.reference_header_length:]
+                    new_reference[-1] &= 0b01111111
+                    length_before = len(pdf_content)
+                    pdf_content = pdf_content[:offset + obj.reference_header_offset] + "".join(map(chr, new_reference)) + pdf_content[offset + obj.header_bytes:]
+                    # Sanity check:
+                    assert length_before == len(pdf_content) + len(new_reference) - obj.reference_header_length
                     obj = parse_pack_object(pdf_content[offset:])
             if offset + obj.header_bytes + 2 == pdf_header_offset - 5:
                 # This is the object containing the PDF, so move it to the front, while we're at it.
