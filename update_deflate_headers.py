@@ -84,6 +84,8 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
                     new_reference[-1] &= 0b01111111
                     length_before = len(pdf_content)
                     pdf_content = pdf_content[:offset + obj.reference_header_offset] + "".join(map(chr, new_reference)) + pdf_content[offset + obj.header_bytes:]
+                    # If we changed the number of bytes in this offset delta,
+                    # then make sure we adjust all future references by that much:
                     offset_delta += len(new_reference) - obj.reference_header_length
                     # Sanity check:
                     assert length_before == len(pdf_content) + len(new_reference) - obj.reference_header_length
