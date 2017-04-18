@@ -2,6 +2,7 @@
 
 import fix_oversize_pdf
 import hashlib
+import math
 import re
 import struct
 import sys
@@ -9,6 +10,44 @@ import zlib
 
 OBJ_OFS_DELTA=6
 OBJ_REF_DELTA=7
+
+def decode_obj_ref(data):
+    # from the git docs:
+    # "n bytes with MSB set in all but the last one.
+    # The offset is then the number constructed by
+    # concatenating the lower 7 bit of each byte, and
+    # for n >= 2 adding 2^7 + 2^14 + ... + 2^(7*(n-1))
+    # to the result."
+    bytes_read = 0
+    reference = 0
+    for c in map(ord, data):
+        bytes_read += 1
+        reference <<= 7
+        reference += c & 0b01111111
+        if not (c & 0b10000000):
+            break
+    if bytes_read >= 2:
+	reference += (1 << (7 * (bytes_read - 1)))
+    return reference, bytes_read
+
+def encode_obj_ref(offset):
+    assert offset >= 0
+    num_bits = int(math.ceil(math.log(offset) / math.log(2)))
+    num_bytes = int(math.ceil(float(num_bits) / 7.0))
+    extra = 0
+    original_offset = offset
+    if num_bytes >= 2:
+        extra = (1 << (7 * (num_bytes - 1)))
+        offset -= extra
+    assert offset >= 0
+    ret = []
+    for i in range(num_bytes):
+        ret.append(((offset >> ((num_bytes - i - 1)*7)) & 0b1111111) | 0b10000000)
+    ret[-1] &= 0b01111111
+    ret = "".join(map(chr, ret))
+    # Sanity check:
+    assert decode_obj_ref(ret)[0] == original_offset
+    return ret
 
 class PackObject(object):
     def __init__(self, **kwargs):
@@ -33,16 +72,12 @@ def parse_pack_object(data):
     if obj_type == OBJ_REF_DELTA:
         header_bytes += 20
     elif obj_type == OBJ_OFS_DELTA:
-        reference = 0
+        reference, reference_bytes = decode_obj_ref(data[header_bytes:])
         reference_offset = header_bytes
-        for i, c in enumerate(map(ord, data[header_bytes:])):
-            header_bytes += 1
-            reference += (c & 0b01111111) << (i * 7)
-            if not (c & 0b10000000):
-                break
+        header_bytes += reference_bytes
         kwargs["reference"] = reference
         kwargs["reference_header_offset"] = reference_offset
-        kwargs["reference_header_length"] = header_bytes - reference_offset
+        kwargs["reference_header_length"] = reference_bytes
     d = zlib.decompressobj()
     try:
         decompressed = d.decompress(data[header_bytes:], length)
@@ -58,7 +93,7 @@ def parse_pack_object(data):
     kwargs["decompressed"] = decompressed
     return PackObject(**kwargs)
 
-def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
+def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False, pdf_size_delta = 0):
     pack_offset = pdf_content.rindex("PACK", 0, pdf_header_offset)
     version, num_objects = struct.unpack("!II", pdf_content[pack_offset + 4:pack_offset + 12])
     print "Found git pack version %d containing %d objects" % (version, num_objects)
@@ -66,37 +101,40 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
     offset = start_offset
     bytes_since_pdf = None
     pdf_length = None
-    offset_delta = 0
+    offset_delta = pdf_size_delta
     for i in range(num_objects):
         #print "Offset: 0x%x" % offset
         obj = parse_pack_object(pdf_content[offset:])
         #print "Parsed pack object at offset 0x%x of type %d with a %d byte header, %d byte body (decompressed), and %d byte body (compressed)" % (offset, obj_type, header_bytes, decompressed_length, compressed_length)
         if fix:
             if bytes_since_pdf is not None and obj.obj_type == OBJ_OFS_DELTA:
-                if obj.reference > bytes_since_pdf:
+                if obj.reference > bytes_since_pdf or offset_delta != 0:
                     # we need to update the offset to account for the fact that the PDF was moved:
-                    print "Updating offset delta object #%d from pointing %d bytes back to instead point %d bytes back..." % (i+1, obj.reference, obj.reference - pdf_length)
-                    new_reference = []
-                    remaining_value = obj.reference - pdf_length + offset_delta
-                    while remaining_value > 0:
-                        new_reference.append((remaining_value & 0b1111111) | 0b10000000)
-                        remaining_value >>= 7
-                    new_reference[-1] &= 0b01111111
+                    new_reference_offset = offset_delta
+                    if obj.reference > bytes_since_pdf:
+                        new_reference_offset += obj.reference - pdf_length
+                    print "Updating offset delta object #%d from pointing %d bytes back to instead point %d bytes back..." % (i+1, obj.reference, new_reference_offset)
+                    new_reference = encode_obj_ref(new_reference_offset)
                     length_before = len(pdf_content)
-                    pdf_content = pdf_content[:offset + obj.reference_header_offset] + "".join(map(chr, new_reference)) + pdf_content[offset + obj.header_bytes:]
+                    pdf_content = pdf_content[:offset + obj.reference_header_offset] + new_reference + pdf_content[offset + obj.header_bytes:]
+                    # Sanity check: make sure that the new file length is correct
+                    assert length_before == len(pdf_content) - (len(new_reference) - obj.reference_header_length)
+                    obj = parse_pack_object(pdf_content[offset:])
+                    # # Sanity check: make sure that the new reference is correct
+                    # try:
+                    #    parse_pack_object(pdf_content[offset-new_reference_offset:])
+                    # except zlib.error:
+                    #    raise Exception("Delta offset at file offset 0x%x is referencing back %d bytes, but that does not correspond to a Pack object!" % (offset, new_reference_offset))
                     # If we changed the number of bytes in this offset delta,
                     # then make sure we adjust all future references by that much:
                     offset_delta += len(new_reference) - obj.reference_header_length
-                    # Sanity check:
-                    assert length_before == len(pdf_content) + len(new_reference) - obj.reference_header_length
-                    obj = parse_pack_object(pdf_content[offset:])
             if offset + obj.header_bytes + 2 == pdf_header_offset - 5:
                 # This is the object containing the PDF, so move it to the front, while we're at it.
                 print "The PDF is contained within pack object %d" % (i+1)
                 print "Moving the PDF object to the front of the pack..."
                 pdf_content = pdf_content[:start_offset] + pdf_content[offset:offset + obj.header_bytes + obj.compressed_length] + pdf_content[start_offset:offset] + pdf_content[offset + obj.header_bytes + obj.compressed_length:]
                 pdf_length = obj.header_bytes + obj.compressed_length
-                bytes_since_pdf = pdf_length
+                bytes_since_pdf = 0
             elif bytes_since_pdf is not None:
                 bytes_since_pdf += obj.header_bytes + obj.compressed_length
         offset += obj.header_bytes + obj.compressed_length
@@ -105,12 +143,15 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False):
     print sha1.hexdigest()
     if sha1.digest() == pdf_content[offset:offset+20]:
         print "SHA1 is valid!"
+        return pdf_content
     else:
         print "SHA1 is not valid!"
         if fix:
             print "Repairing the SHA1..."
             pdf_content = pdf_content[:offset] + sha1.digest() + pdf_content[offset+20:]
-    return pdf_content
+            # Validate that we've repaired it:
+            return fix_pack_sha1(pdf_content, pdf_header_offset)
+        return None
     
 def read_deflate_header(header):
     last = bool(0b1 & ord(header[0]))
@@ -147,6 +188,7 @@ def update_deflate_headers(pdf_content, output, block_offsets):
         return
     print "Deleting the unwanted DEFLATE headers..."
     header_offset = pdf_header_offset + length
+    pdf_size_delta = 0
     while not last:
         header = pdf_content[header_offset:header_offset+5]
         try:
@@ -156,7 +198,8 @@ def update_deflate_headers(pdf_content, output, block_offsets):
             raise e
         pdf_content = pdf_content[:header_offset] + pdf_content[header_offset + 5:]
         print "Deleted DEFLATE header at offset 0x%x for a %d byte block" % (header_offset, length)
-        header_offset += length 
+        header_offset += length
+        pdf_size_delta -= 5
     print "Updating the first DEFLATE header..."
     pdf_content = pdf_content[:pdf_header_offset + block_offsets[0][0]] + make_deflate_header(False, block_offsets[0][1]) + pdf_content[pdf_header_offset:]
     print "Updating the injected DEFLATE headers..."
@@ -165,11 +208,22 @@ def update_deflate_headers(pdf_content, output, block_offsets):
         offset, length = block
         print "Injecting DEFLATE header at offset 0x%x for a %d byte block" % (pdf_header_offset + offset, length)
         pdf_content = pdf_content[:pdf_header_offset + offset] + make_deflate_header(last, length) + pdf_content[pdf_header_offset + offset:]
+        pdf_size_delta += 5
     content_after = zlib.decompress(pdf_content[pdf_header_offset - 7:])
     print "Validating the resulting DEFLATE headers..."
     if content_before != content_after:
         raise Exception("Error: the updated DEFLATE output is corrupt!")
-    pdf_content = fix_pack_sha1(pdf_content, pdf_header_offset, fix = True)
+    sys.stdout.write("Updating the DEFLATE headers ")
+    if pdf_size_delta == 0:
+        sys.stdout.write("did not change the size of the PDF object\n")
+    else:
+        if pdf_size_delta > 0:
+            sys.stdout.write("added %d bytes to" % pdf_size_delta)
+        else:
+            sys.stdout.write("removed %d bytes from" % (pdf_size_delta * -1))
+        sys.stdout.write(" the PDF object\n")
+    sys.stdout.flush()
+    pdf_content = fix_pack_sha1(pdf_content, pdf_header_offset, fix = True, pdf_size_delta = pdf_size_delta)
     out.write(pdf_content)
     out.flush()
 
