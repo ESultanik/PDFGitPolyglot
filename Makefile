@@ -10,7 +10,7 @@ all : article_bundle.pdf
 .PHONY : clean
 clean : git-submodule
 	$(MAKE) -C git clean
-	rm article_bundle.pdf article.pdf article.log article.aux *~
+	rm -f article_bundle.pdf article.pdf article.log article.aux *~
 
 .PHONY : git-submodule
 git-submodule :
