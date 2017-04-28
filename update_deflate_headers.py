@@ -93,36 +93,6 @@ def parse_pack_object(data):
     kwargs["decompressed"] = decompressed
     return PackObject(**kwargs)
 
-def verify_pack(pdf_content, pdf_header_offset, pdf_size_delta = 0):
-    pack_offset = pdf_content.rindex("PACK", 0, pdf_header_offset)
-    version, num_objects = struct.unpack("!II", pdf_content[pack_offset + 4:pack_offset + 12])
-    print "Found git pack version %d containing %d objects" % (version, num_objects)
-    start_offset = pack_offset + 12
-    offset = start_offset
-    bytes_since_pdf = None
-    pdf_length = None
-    offset_delta = pdf_size_delta
-    objects_by_offset = {}
-    for i in range(num_objects):
-        obj = parse_pack_object(pdf_content[offset:])
-        objects_by_offset[offset] = obj
-        if obj.obj_type == OBJ_OFS_DELTA:
-            print "Checking OBJ OFS DELTA reference..."
-            # Sanity check: make sure that the new reference is correct
-            #if offset - obj.reference not in objects_by_offset:
-            #    try:
-            #        parse_pack_object(pdf_content[offset-obj.reference-pdf_size_delta:])
-            #    except Exception:
-            #        pass
-            #try:
-            #    print offset, obj.reference, pdf_size_delta
-            #    ref = parse_pack_object(pdf_content[offset-obj.reference-pdf_size_delta:])
-            #    print "Valid OBJ_OFS_DELTA pack object, referring to an object of type %s" % ref.obj_type
-            #except zlib.error:
-            #    raise Exception("Delta offset at file offset 0x%x is referencing back %d bytes, but that does not correspond to a Pack object!" % (offset, obj.reference))
-        offset += obj.header_bytes + obj.compressed_length
-    return pack_offset, start_offset
-
 def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False, pdf_size_delta = 0):
     pack_offset = pdf_content.rindex("PACK", 0, pdf_header_offset)
     version, num_objects = struct.unpack("!II", pdf_content[pack_offset + 4:pack_offset + 12])
@@ -137,34 +107,9 @@ def fix_pack_sha1(pdf_content, pdf_header_offset, fix = False, pdf_size_delta = 
         obj = parse_pack_object(pdf_content[offset:])
         #print "Parsed pack object at offset 0x%x of type %d with a %d byte header, %d byte body (decompressed), and %d byte body (compressed)" % (offset, obj_type, header_bytes, decompressed_length, compressed_length)
         if fix:
-            if bytes_since_pdf is not None and obj.obj_type == OBJ_OFS_DELTA:
-                if obj.reference > bytes_since_pdf or offset_delta != 0:
-                    # we need to update the offset to account for the fact that the PDF was moved:
-                    new_reference_offset = obj.reference
-                    if obj.reference > bytes_since_pdf:
-                        new_reference_offset -= pdf_length
-                    if new_reference_offset < 0:
-                        print "This delta is pointing inside the PDF"
-                        offset_in_pdf = pdf_length - (obj.reference - bytes_since_pdf)
-                        new_reference_offset = offset - start_offset - offset_in_pdf
-                    else:
-                        new_reference_offset += offset_delta
-                    print "Updating offset delta object #%d from pointing %d bytes back to instead point %d bytes back..." % (i+1, obj.reference, new_reference_offset)
-                    new_reference = encode_obj_ref(new_reference_offset)
-                    length_before = len(pdf_content)
-                    pdf_content = pdf_content[:offset + obj.reference_header_offset] + new_reference + pdf_content[offset + obj.header_bytes:]
-                    # Sanity check: make sure that the new file length is correct
-                    assert length_before == len(pdf_content) - (len(new_reference) - obj.reference_header_length)
-                    obj = parse_pack_object(pdf_content[offset:])
-                    # Sanity check: make sure that the new reference is correct
-                    #try:
-                    #   parse_pack_object(pdf_content[offset-new_reference_offset:])
-                    #except zlib.error:
-                    #   raise Exception("Delta offset at file offset 0x%x is referencing back %d bytes, but that does not correspond to a Pack object!" % (offset, new_reference_offset))
-                    # If we changed the number of bytes in this offset delta,
-                    # then make sure we adjust all future references by that much:
-                    offset_delta += len(new_reference) - obj.reference_header_length
-            if offset + obj.header_bytes + 2 == pdf_header_offset - 5:
+            if obj.obj_type == OBJ_OFS_DELTA:
+                raise Exception('We don\'t currently support fixing OBJ_OFS_DELTA objects! Try running `git pack-objects` with the delta-base-offset argument.')
+            elif offset + obj.header_bytes + 2 == pdf_header_offset - 5:
                 # This is the object containing the PDF, so move it to the front, while we're at it.
                 print "The PDF is contained within pack object %d" % (i+1)
                 print "Moving the PDF object to the front of the pack..."
@@ -214,7 +159,6 @@ def update_deflate_headers(pdf_content, output, block_offsets):
         raise Exception("Could not find PDF header!")
     pdf_header_offset = len(m.group(1))
     print "Found PDF header at offset %d" % pdf_header_offset
-    verify_pack(pdf_content, pdf_header_offset)
     initial_repair = fix_pack_sha1(pdf_content, pdf_header_offset)
     assert initial_repair == pdf_content # Make sure the input has a valid SHA1
     content_before = zlib.decompress(pdf_content[pdf_header_offset - 7:])
