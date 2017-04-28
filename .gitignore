@@ -1,5 +1,10 @@
+\#*\#
 *~
-*.log
 *.aux
+*.log
+*.pyc
 article.pdf
+article.pdf.block_offsets
 article_bundle.pdf
+article_bundle.pdf.polyglot
+article_injected.pdf
