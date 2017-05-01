@@ -139,17 +139,161 @@ complete object), the header is followed by either the SHA-1 hash of
 the base object to which the delta should be applied, or a byte
 reference within the packfile for the start of the base object. The
 remainder of the chunk consists of the object data, zlib-compressed.
+
+This is the format of the variable length chunk header:
 \begin{center}
 {\newcount\bitnum\bitnum=0
 \begin{tikzpicture}
 \node[coordinate] at (0,0) (b0) {};
-\foreach \i in {1,0,1,1,0,1,0,0,0,1,0,1,0,1,1,0} {
+\foreach \i in {1,0,1,1,0,1,0,0,1,1,0,1,0,1,1,0,0,1,0,0,1,0,0,1} {
   {\newcount\prevbit\prevbit=\bitnum
   \global\advance\bitnum by 1
   \node[anchor=west] at (b\the\prevbit.east) (b\the\bitnum) {\i};}
   \draw ([xshift=1pt]b\the\bitnum.south west) -- ([xshift=-1pt]b\the\bitnum.south east);
 }
+\draw [
+    thick,
+    decoration={
+        brace,
+        mirror,
+        raise=-2pt
+    },
+    decorate
+] ([xshift=-1pt]b8.north east) -- ([xshift=1pt]b1.north west)
+node [pos=0.5,anchor=south,yshift=-2pt] {\footnotesize first byte};
+\draw [
+    thick,
+    decoration={
+        brace,
+        mirror,
+        raise=-2pt
+    },
+    decorate
+] ([xshift=-1pt]b16.north east) -- ([xshift=1pt]b9.north west)
+node [pos=0.5,anchor=south,yshift=-2pt] {\footnotesize second byte};
+\draw [
+    thick,
+    decoration={
+        brace,
+        mirror,
+        raise=-2pt
+    },
+    decorate
+] ([xshift=-1pt]b24.north east) -- ([xshift=1pt]b17.north west)
+node [pos=0.5,anchor=south,yshift=-2pt] {\footnotesize third byte};
+
+\draw [
+    thick,
+    decoration={
+        brace,
+        mirror,
+        raise=2pt
+    },
+    decorate
+] ([xshift=1pt]b2.south west) -- ([xshift=-1pt]b4.south east)
+node [pos=0.5,yshift=-2pt,anchor=north] (type) {\footnotesize object type};
+
+\draw[<-] (b1) -- (type.south -| b1) node[anchor=north,align=center,font=\footnotesize] {if the MSB is one,\\then this is not\\the last byte};
+
+\draw [
+    thick,
+    decoration={
+        brace,
+        mirror,
+        raise=2pt
+    },
+    decorate
+] ([xshift=1pt]b5.south west) -- ([xshift=-1pt]b8.south east)
+node [pos=0.5,yshift=-2pt,anchor=north,align=center,font=\footnotesize] (length) {first four\\bits of\\the length\\(big-endian)};
+
+\draw[<-] (b9) -- (length.south -| b9) node[anchor=north,align=center,font=\footnotesize] {MSB is one,\\so this is \emph{not} the last byte};
+
+\draw [
+    thick,
+    decoration={
+        brace,
+        mirror,
+        raise=2pt
+    },
+    decorate
+] ([xshift=1pt]b10.south west) -- ([xshift=-1pt]b16.south east)
+node [pos=0.5,yshift=-2pt,anchor=north,align=center,font=\footnotesize] (next) {the next seven\\bits of the length\\(big-endian)};
+
+\draw[<-] (b17) -- (next.south -| b17) node[anchor=north,align=center,font=\footnotesize] {MSB is zero,\\so this is the last byte};
+
+\draw [
+    thick,
+    decoration={
+        brace,
+        mirror,
+        raise=2pt
+    },
+    decorate
+] ([xshift=1pt]b18.south west) -- ([xshift=-1pt]b24.south east)
+node [pos=0.5,yshift=-2pt,anchor=north,align=center,font=\footnotesize] {the next seven\\bits of the length\\(big-endian)};
+
 \end{tikzpicture}}
+\end{center}
+This example header represents an object of type \texttt{0b011}, which
+happens to be a git blob, and an \emph{uncompressed} length of
+$(100_2\,\verb|<<|\,14) +
+(1010110_2\,\verb|<<|\,7) + 1001001_2
+= 76617$ bytes.  Since this is not a delta object, it is immediately
+followed by the zlib-compressed object data.
+
+%% TODO: Talk about the Delta Ref file format
+
+\section{A Minimal Polyglot PoC}
+
+We now know that a git bundle is really just a git packfile with an
+additional header, and a git packfile stores individual objects using
+zlib, which uses the DEFLATE compression algorithm. DEFLATE supports
+zero compression, so if we can store the PDF in a single object (as
+opposed to it being split into deltas), then we could theoretically
+coerce it to be intact within a valid git bundle.
+
+Forcing the PDF into a single object is easy: We just need to add it
+to the repo last, immediately before generating the bundle.
+
+Getting the object to be compressed with zero compression is also
+relatively easy.  That's because git was built in almost religious
+adherence to The UNIX Philosophy: It is architected with hundreds of
+sub commands it calls ``plumbing,'' of which the vast majority you
+will likely have never heard. For example, you might be aware
+that \texttt{git pull} is equivalent to a \texttt{git fetch} followed
+by a \texttt{git merge}. In fact, the \texttt{pull} code is actually
+spawning a new \texttt{git} child process to execute each of those
+subcommands. Likewise, the \texttt{git bundle} command spawns
+a \texttt{git pack-objects} to generate the packfile portion of the
+bundle.  All we need to do is inject the \texttt{--compression=0}
+argument into the list of command line arguments passed
+to \texttt{pack-objects}.  This is a one-line addition
+to \texttt{bundle.c}:\\
+{\footnotesize
+{\color{gray}
+\verb|    argv_array_pushl(&pack_objects.args,|\\
+\verb|                     "pack-objects", "--all-progress-implied",|}\\
+\verb|                     "--compression=0",|\\
+{\color{gray}
+\verb|                     "--stdout", "--thin", "--delta-base-offset",|\\
+\verb|                     NULL);|
+}}
+
+Using our patched version of git, every object stored in the bundle
+will be uncompressed!
+\begin{center}
+\begingroup
+\setbox9=\hbox{\footnotesize\verb|$ git bundle create article_bundle.pdf --all|}
+\begin{minipage}{\wd9}
+\footnotesize\begin{verbatim}
+$ export PATH=/path/to/patched/git:$PATH
+$ git init .
+$ git add article.pdf
+$ git commit article.pdf -m "added"
+$ git bundle create polyglot.pdf --all
+\end{verbatim}
+\end{minipage}
+\endgroup
 \end{center}
 
 \end{document}
