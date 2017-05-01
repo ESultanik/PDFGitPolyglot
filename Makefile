@@ -24,9 +24,12 @@ git/configure : | git-submodule
 git/git : | git/configure
 	$(MAKE) CC=$(CC) CXX=$(CXX) AR=$(AR) -C git
 
-article.pdf : article.tex
+article.pdf : article.tex RazvodityeKrolikov_small.jpg
 	pdflatex $<
 	pdflatex $<
+
+%_small.jpg : %.jpg
+	convert $< -define jpeg:extent=64kb $@
 
 %_injected.pdf %.pdf.block_offsets : %.pdf fix_oversize_pdf.py
 	python fix_oversize_pdf.py $*.pdf $@
