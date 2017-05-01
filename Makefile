@@ -10,7 +10,7 @@ all : article_bundle.pdf
 .PHONY : clean
 clean : git-submodule
 	$(MAKE) -C git clean
-	rm -f article_bundle.pdf article.pdf article.log article.aux *~
+	rm -f article_bundle.pdf article.pdf article.log article.aux *~ RazvodityeKrolikov_small.jpg kolskaya.pdf
 
 .PHONY : git-submodule
 git-submodule :
@@ -32,7 +32,7 @@ article.pdf : article.tex RazvodityeKrolikov_small.jpg kolskaya.pdf
 	pdflatex article
 
 %_small.jpg : %.jpg
-	convert $< -define jpeg:extent=32kb $@
+	convert $< -define jpeg:extent=63kb $@
 
 %_injected.pdf %.pdf.block_offsets : %.pdf fix_oversize_pdf.py
 	python fix_oversize_pdf.py $*.pdf $@
