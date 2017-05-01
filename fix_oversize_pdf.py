@@ -33,10 +33,6 @@ def parse_obj(pdf_content, logger = None):
             logger("Error: did not find end of PDF \"%s\"!\n" % line)
     return None, None
 
-DEFLATE_OBJ_START="%d 0 obj\n<<\n/Length 5\n>>\nstream\n"
-DEFLATE_OBJ_PRE_LEN=len(DEFLATE_OBJ_START) + 2
-DEFLATE_OBJ_END="endstream\nendobj\n"
-
 def calculate_deflate_locations(objects, additional_bytes = 0):
     if not objects:
         return []
@@ -45,7 +41,7 @@ def calculate_deflate_locations(objects, additional_bytes = 0):
         # should we put a deflate header before object i?
         start, l = obj
         last = (i == len(objects) - 1)
-        if length + l + [len("%% "),0][last] > 0xFFFF:
+        if length + l + [len("%% "),0][last] + 5 > 0xFFFF:
             return [i] + map(lambda j : j+i, calculate_deflate_locations(objects[i:], additional_bytes = 1))
         length += l
     return []
@@ -86,8 +82,8 @@ def fix_pdf(pdf_content, output = None, logger = None):
         if start is None:
             break
         objects.append((offset + start, length))
-        if length > 0xFFFF - DEFLATE_OBJ_PRE_LEN:
-            raise Exception("The object at PDF offset %d is %d bytes, which is more than the maximum of %d! This PDF cannot be fixed." % (offset + start, length, 0xFFFF - DEFLATE_OBJ_PRE_LEN))
+        if length > 0xFFFF - 5 - 4:
+            raise Exception("The object at PDF offset %d is %d bytes, which is more than the maximum of %d! This PDF cannot be fixed." % (offset + start, length, 0xFFFF - 5 - 4))
         offset += start + length
     logger("Parsed %d PDF objects.\n" % len(objects))
     locations = calculate_deflate_locations(objects)
