@@ -32,7 +32,7 @@ article.pdf : article.tex RazvodityeKrolikov_small.jpg kolskaya.pdf
 	pdflatex article
 
 %_small.jpg : %.jpg
-	convert $< -define jpeg:extent=64kb $@
+	convert $< -define jpeg:extent=32kb $@
 
 %_injected.pdf %.pdf.block_offsets : %.pdf fix_oversize_pdf.py
 	python fix_oversize_pdf.py $*.pdf $@

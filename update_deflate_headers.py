@@ -156,6 +156,30 @@ def make_deflate_header(last, length):
     assert read_deflate_header(header) == (last, length)
     return header
 
+def find_deflate_headers(data):
+    last = False
+    offset = 0
+    i = 0
+    while not last:
+        i += 1
+        try:
+            last, length = read_deflate_header(data[offset:offset + 5])
+        except Exception as e:
+            actual_header = None
+            for j in reduce(lambda x, y : x + y, map(lambda n : (-n,n), range(1,0x8000))):
+                try:
+                    last, length = read_deflate_header(data[offset + j:offset + j + 5])
+                    actual_header = j
+                    break
+                except Exception:
+                    pass
+            if actual_header is not None:
+                raise Exception("Bad DEFLATE header (#%d) at offset %d; it looks like the length was off by %d" % (i, offset, actual_header));
+            else:
+                raise Exception("Bad DEFLATE header (#%d) at offset %d" % (i, offset));
+        yield offset, last, length
+        offset += 5 + length
+
 def update_deflate_headers(pdf_content, output, block_offsets):
     m = re.match(r"(.*?)" + fix_oversize_pdf.PDF_HEADER,pdf_content,re.MULTILINE | re.DOTALL)
     if not m:
@@ -166,24 +190,24 @@ def update_deflate_headers(pdf_content, output, block_offsets):
     assert initial_repair == pdf_content # Make sure the input has a valid SHA1
     content_before = zlib.decompress(pdf_content[pdf_header_offset - 7:])
     deflate_header = pdf_content[:pdf_header_offset][-5:]
-    last, length = read_deflate_header(deflate_header)
-    if last:
-        print "The entire PDF fits in a single DEFLATE block; nothing needed!"
-        return
-    print "Deleting the unwanted DEFLATE headers..."
-    header_offset = pdf_header_offset + length
-    pdf_size_delta = 0
-    while not last:
-        header = pdf_content[header_offset:header_offset+5]
-        try:
-            last, length = read_deflate_header(header)
-        except Exception as e:
-            print " ".join(map(hex, map(ord, pdf_content[header_offset-5:header_offset+10])))
-            raise e
+
+    idx = 0
+    for offset, last, length in find_deflate_headers(pdf_content[pdf_header_offset-5:]):
+        if idx == 0:
+            if last:
+                print "The entire PDF fits in a single DEFLATE block; nothing needed!"
+                return
+            idx += 1
+            continue
+        elif idx == 1:
+            print "Deleting the unwanted DEFLATE headers..."
+            pdf_size_delta = 0
+        header_offset = pdf_header_offset - 5 * idx + offset
         pdf_content = pdf_content[:header_offset] + pdf_content[header_offset + 5:]
         print "Deleted DEFLATE header at offset 0x%x for a %d byte block" % (header_offset, length)
-        header_offset += length
         pdf_size_delta -= 5
+        idx += 1
+    
     print "Updating the first DEFLATE header..."
     pdf_content = pdf_content[:pdf_header_offset + block_offsets[0][0]] + make_deflate_header(False, block_offsets[0][1]) + pdf_content[pdf_header_offset:]
     print "Updating the injected DEFLATE headers..."
@@ -198,7 +222,7 @@ def update_deflate_headers(pdf_content, output, block_offsets):
     content_after = zlib.decompress(pdf_content[pdf_header_offset - 7:])
     print "Validating the resulting DEFLATE headers..."
     if content_before != content_after:
-        raise Exception("Error: the updated DEFLATE output is corrupt!")
+       raise Exception("Error: the updated DEFLATE output is corrupt!")
     sys.stdout.write("Updating the DEFLATE headers ")
     if pdf_size_delta == 0:
         sys.stdout.write("did not change the size of the PDF object\n")

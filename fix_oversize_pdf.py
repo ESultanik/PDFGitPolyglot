@@ -44,8 +44,9 @@ def calculate_deflate_locations(objects, additional_bytes = 0):
     for i, obj in enumerate(objects):
         # should we put a deflate header before object i?
         start, l = obj
-        if length + l + DEFLATE_OBJ_PRE_LEN > 0xFFFF:
-            return [i] + map(lambda j : j+i, calculate_deflate_locations(objects[i:], additional_bytes = len(DEFLATE_OBJ_END)))
+        last = (i == len(objects) - 1)
+        if length + l + [len("%% "),0][last] > 0xFFFF/2:
+            return [i] + map(lambda j : j+i, calculate_deflate_locations(objects[i:], additional_bytes = 1))
         length += l
     return []
 
@@ -53,7 +54,7 @@ PDF_HEADER = r"%PDF-1.\d\s*\n%\xD0\xD4\xC5\xD8\s*\n"
 
 def bytes_to_inject(length):
     """Calculates the number of bytes we need to inject after the DEFLATE header to make its length be valid within the PDF"""
-    if length > 0xFFFF:
+    if length > 0xFFFF/2:
         raise Exception("A PDF object of length %d cannot be fixed!" % length)
     b1 = length & 0xFF
     b2 = (length & 0xFF00) >> 8
@@ -85,8 +86,8 @@ def fix_pdf(pdf_content, output = None, logger = None):
         if start is None:
             break
         objects.append((offset + start, length))
-        if length > 0xFFFF - DEFLATE_OBJ_PRE_LEN:
-            raise Exception("The object at PDF offset %d is %d bytes, which is more than the maximum of %d! This PDF cannot be fixed." % (offset + start, length, 0xFFFF - DEFLATE_OBJ_PRE_LEN))
+        if length > 0xFFFF/2 - DEFLATE_OBJ_PRE_LEN:
+            raise Exception("The object at PDF offset %d is %d bytes, which is more than the maximum of %d! This PDF cannot be fixed." % (offset + start, length, 0xFFFF/2 - DEFLATE_OBJ_PRE_LEN))
         offset += start + length
     logger("Parsed %d PDF objects.\n" % len(objects))
     locations = calculate_deflate_locations(objects)
@@ -101,8 +102,11 @@ def fix_pdf(pdf_content, output = None, logger = None):
             length = len(pdf_content[objects[i][0]:])
         else:
             last = False
-            length = objects[i+1][0] - objects[i][0]
+            length = objects[locations[idx+1]][0] - objects[i][0]
         length += 1 # We always have to add a newline to end the comment
+        if idx < len(locations) - 1:
+            # We need to add three more bytes for the '%% ' before the next deflate block header:
+            length += 3
         extra_bytes = bytes_to_inject(length)
         length += extra_bytes
         if idx == 0:
