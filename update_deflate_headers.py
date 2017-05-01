@@ -188,6 +188,8 @@ def update_deflate_headers(pdf_content, output, block_offsets):
         last = (idx == len(block_offsets) - 2)
         offset, length = block
         print "Injecting DEFLATE header at offset 0x%x for a %d byte block" % (pdf_header_offset + offset, length)
+        # Sanity check: the injection position should be preceeded by a PDF comment
+        assert pdf_content[pdf_header_offset + offset - 3:pdf_header_offset + offset] == '%% '
         pdf_content = pdf_content[:pdf_header_offset + offset] + make_deflate_header(last, length) + pdf_content[pdf_header_offset + offset:]
         pdf_size_delta += 5
     content_after = zlib.decompress(pdf_content[pdf_header_offset - 7:])

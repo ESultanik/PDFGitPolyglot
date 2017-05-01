@@ -86,7 +86,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
             break
         objects.append((offset + start, length))
         if length > 0xFFFF - DEFLATE_OBJ_PRE_LEN:
-            raise Exception("The object at PDF offset %d is more than %d bytes! This PDF cannot be fixed." % (0xFFFF - DEFLATE_OBJ_PRE_LEN))
+            raise Exception("The object at PDF offset %d is %d bytes, which is more than the maximum of %d! This PDF cannot be fixed." % (offset + start, length, 0xFFFF - DEFLATE_OBJ_PRE_LEN))
         offset += start + length
     logger("Parsed %d PDF objects.\n" % len(objects))
     locations = calculate_deflate_locations(objects)
