@@ -24,9 +24,12 @@ git/configure : | git-submodule
 git/git : | git/configure
 	$(MAKE) CC=$(CC) CXX=$(CXX) AR=$(AR) -C git
 
-article.pdf : article.tex RazvodityeKrolikov_small.jpg
+kolskaya.pdf : kolskaya.tex
 	pdflatex $<
-	pdflatex $<
+
+article.pdf : article.tex RazvodityeKrolikov_small.jpg kolskaya.pdf
+	pdflatex article
+	pdflatex article
 
 %_small.jpg : %.jpg
 	convert $< -define jpeg:extent=64kb $@
