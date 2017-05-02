@@ -241,7 +241,7 @@ header are of the same format as bytes two and three in this
 example. This example header represents an object of type $11_2$,
 which happens to be a git blob, and an \emph{uncompressed} length of
 $(100_2\,\verb|<<|\,14) + (1010110_2\,\verb|<<|\,7) + 1001001_2 =
-76617$ bytes.  Since this is not a delta object, it is immediately
+76$,617 bytes.  Since this is not a delta object, it is immediately
 followed by the zlib-compressed object data. The header does not
 encode the \emph{compressed} size of the object, since the DEFLATE
 encoding can determine the end of the object as it is being
@@ -281,16 +281,14 @@ adherence to The UNIX Philosophy: It is architected with hundreds of
 sub commands it calls ``plumbing,'' of which the vast majority you
 will likely have never heard. For example, you might be aware
 that \texttt{git pull} is equivalent to a \texttt{git fetch} followed
-by a \texttt{git merge}. In fact, the \texttt{pull} code is actually
-spawning a new \texttt{git} child process to execute each of those
+by a \texttt{git merge}. In fact, the \texttt{pull} code actually
+spawns a new \texttt{git} child process to execute each of those
 subcommands. Likewise, the \texttt{git bundle} command spawns
-a \texttt{git pack-objects} to generate the packfile portion of the
-bundle.  All we need to do is inject the \texttt{--compression=0}
-argument into the list of command line arguments passed
-to \texttt{pack-objects}.  This is a one-line addition
-to \texttt{bundle.c}:\\
-{\footnotesize
-{\color{gray}
+a \texttt{git pack-objects} child process to generate the packfile
+portion of the bundle.  All we need to do is inject
+the \texttt{--compression=0} argument into the list of command line
+arguments passed to \texttt{pack-objects}.  This is a one-line
+addition to \texttt{bundle.c}:\\ {\footnotesize {\color{gray}
 \verb|    argv_array_pushl(&pack_objects.args,|\\
 \verb|                     "pack-objects", "--all-progress-implied",|}\\
 \verb|                     "--compression=0",|\\
@@ -321,6 +319,55 @@ PDF readers ignore garbage bytes before and after the PDF.
 
 \section{Generalizing the PoC}
 
-There are, of course, some 
+There are, of course, several limitations to the minimal PoC given in
+the previous section:
+\begin{enumerate}
+
+\item Adobe, being Adobe, will refuse to open the polyglot unless the PDF is version 1.4 or earlier.  I guess it doesn't like some element of the git bundle signature or digest if it's PDF~1.5? Why? Because Adobe, that's why.
+
+\item Leaving the entire Git bundle uncompressed is wasteful if the repo contains other files; really, we only need the PDF to be uncompressed.
+
+\item If the PDF is larger than 65,535 bytes---the maximum size of an uncompressed DEFLATE block---then git will inject 5-byte deflate block headers inside the PDF, likely corrupting it.
+
+\item Adobe will also refuse to open the polyglot unless the PDF is near the beginning of the packfile\footnote{Requiring the PDF header to start near the beginning of a file is common for many, but not all, PDF viewers.}.
+
+\end{enumerate}
+
+The first limitation is easy to fix by instructing \LaTeX\ to produce
+a version 1.4~PDF by adding \texttt{\textbackslash pdfminorversion=4}
+to the document.
+
+The second limitation is a simple matter of software engineering,
+adding a command line argument to the \texttt{git bundle} command that
+accepts the hash of the single file to leave uncompressed, and passing
+that hash to \texttt{git pack-objects}. I have created a fork of git
+with this feature, available here:
+\begin{center}
+  \texttt{https://github.com/ESultanik/git/tree/UncompressedPack}
+\end{center}
+
+As an aside, while fixing the second limitation I discovered that if a
+file has multiple PDFs concatenated after one another
+(\textit{i.e.},~a git bundle polyglot with multiple uncompressed PDFs
+in the repo), then the behavior is viewer-dependent: Some viewers will
+render the first PDF, while others will render the last.  That's a fun
+way to generate a PDF that displays completely different content in,
+say, macOS~Preview versus Adobe.
+
+The third limitation is very tricky, and ultimately why this polyglot
+was not used for the PDF of a digital issue of PoC$\|$GTFO. I've a
+solution, but it will not work if the PDF contains any objects
+(\textit{e.g.}, images) that are larger than 65,535 bytes. A universal
+solution would be to break up the image into smaller ones and tile it
+back together, but that is not feasible for a document the size of a
+PoC$\|$GTFO issue.
+
+DEFLATE headers for uncompressed blocks are very simple: The first
+byte encodes whether the following block is the last in the file, the
+next two bytes encode the block length, and the last two bytes are the
+ones' complement of the length.  Therefore, to resolve this issue, all
+we need to do is move all of the DEFLATE headers that zlib created to
+different positions that won't corrupt the PDF, and update their
+lengths accordingly.
 
 \end{document}
