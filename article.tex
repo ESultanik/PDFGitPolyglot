@@ -51,6 +51,7 @@ article.pdf
 \end{center}
 
 \section{The Git Bundle File Format}
+\label{sec:GitBundleFormat}
 
 The file format for Git bundles doesn't appear to be formally
 specified anywhere, however, inspecting \texttt{bundle.c} reveals that
@@ -122,14 +123,15 @@ node (#1label) [pos=0.5,anchor=north,yshift=-2pt]}
 \end{tikzpicture}}
 \end{center}
 
-I hope you like Soviet holes, dear neighbor, because chasing this
-rabbit might remind you of \includegraphics{kolskaya}. I think it is
-useful to describe the git packfile format here, since it is not well
-documented elsewhere. If that doesn't interest you, it's safe to skip
-to the next section.
+Although not entirely required to understand the polyglot, I think it
+is useful to describe the git packfile format here, since it is not
+well documented elsewhere. If that doesn't interest you, it's safe to
+skip to the next section.  But if you do proceed, I hope you like
+Soviet holes, dear neighbor, because chasing this rabbit might remind
+you of \includegraphics{kolskaya}.
 
 \begin{center}
-\includegraphics[width=0.5\hsize]{RazvodityeKrolikov_small}
+\includegraphics[width=0.33\hsize]{RazvodityeKrolikov_small}
 \end{center}
 
 Okay, the next step is to figure out the ``chunk'' format.  The chunk
@@ -323,7 +325,7 @@ There are, of course, several limitations to the minimal PoC given in
 the previous section:
 \begin{enumerate}
 
-\item Adobe, being Adobe, will refuse to open the polyglot unless the PDF is version 1.4 or earlier.  I guess it doesn't like some element of the git bundle signature or digest if it's PDF~1.5? Why? Because Adobe, that's why.
+\item Adobe, being Adobe, will refuse to open the polyglot unless the PDF is version 1.4 or earlier.  I guess it doesn't like some element of the git bundle signature or digest if it's PDF~1.5. Why? Because Adobe, that's why.
 
 \item Leaving the entire Git bundle uncompressed is wasteful if the repo contains other files; really, we only need the PDF to be uncompressed.
 
@@ -369,5 +371,31 @@ ones' complement of the length.  Therefore, to resolve this issue, all
 we need to do is move all of the DEFLATE headers that zlib created to
 different positions that won't corrupt the PDF, and update their
 lengths accordingly.
+
+So, where can we put a 5-byte DEFLATE header such that it won't
+corrupt the PDF? We could use our standard trick of putting it in a
+PDF object stream that we've exploited countless times before to
+enable PoC$\|$GTFO polyglots. The trouble with that is that object
+streams are fixed-length, so once the PDF is decompressed
+(\textit{i.e.},~when a repo is cloned from the git bundle), then all
+of the 5-byte DEFLATE headers will disappear and the object stream
+lengths would all be incorrect. Instead, I chose to use PDF comments,
+which start at any occurrence of the percent sign character~(\%)
+outside a string or stream and continue until the first occurrence of
+a newline.  All of the PDF viewers I tested don't seem to care if
+comments include non-ASCII characters; they seem to simply scan for a
+newline. Therefore, we can inject ``\texttt{\%\textbackslash n}''
+between PDF objects and move the DEFLATE headers there. The only
+caveat is that the DEFLATE header itself can't contain a newline
+byte~(\texttt{0x0A}), otherwise the comment would be ended
+prematurely.  We can resolve that by adding extra spaces to the end of
+the comment, increasing the length of the following DEFLATE block and
+thus increasing the length bytes in the DEFLATE header and avoiding
+the \texttt{0x0A}. The only concession made with this approach is that
+PDF Xref offsets in the deflated version of the PDF will be off by a
+multiple of 5, due to the removed DEFLATE headers. Fortunately, most
+PDF readers can gracefully handle incorrect Xref offsets (at the
+expense of a slower loading time), and this will only affect the PDF
+contained in the repository, \emph{not} the PDF polyglot.
 
 \end{document}
