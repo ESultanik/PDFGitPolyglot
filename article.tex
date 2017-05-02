@@ -193,7 +193,7 @@ node [pos=0.5,anchor=south,yshift=-2pt] {\footnotesize third byte};
 ] ([xshift=1pt]b2.south west) -- ([xshift=-1pt]b4.south east)
 node [pos=0.5,yshift=-2pt,anchor=north] (type) {\footnotesize object type};
 
-\draw[<-] (b1) -- (type.south -| b1) node[anchor=north,align=center,font=\footnotesize] {if the MSB is one,\\then this is not\\the last byte};
+\draw[<-] ([yshift=-2pt]b1.south) -- (type.south -| b1) node[anchor=north,align=center,font=\footnotesize] {if the MSB is one,\\then this is not\\the last byte};
 
 \draw [
     thick,
@@ -206,7 +206,7 @@ node [pos=0.5,yshift=-2pt,anchor=north] (type) {\footnotesize object type};
 ] ([xshift=1pt]b5.south west) -- ([xshift=-1pt]b8.south east)
 node [pos=0.5,yshift=-2pt,anchor=north,align=center,font=\footnotesize] (length) {first four\\bits of\\the length\\(big-endian)};
 
-\draw[<-] (b9) -- (length.south -| b9) node[anchor=north,align=center,font=\footnotesize] {MSB is one,\\so this is \emph{not} the last byte};
+\draw[<-] ([yshift=-2pt]b9.south) -- (length.south -| b9) node[anchor=north,align=center,font=\footnotesize] {MSB is one,\\so this is \emph{not} the last byte};
 
 \draw [
     thick,
@@ -219,7 +219,7 @@ node [pos=0.5,yshift=-2pt,anchor=north,align=center,font=\footnotesize] (length)
 ] ([xshift=1pt]b10.south west) -- ([xshift=-1pt]b16.south east)
 node [pos=0.5,yshift=-2pt,anchor=north,align=center,font=\footnotesize] (next) {the next seven\\bits of the length\\(big-endian)};
 
-\draw[<-] (b17) -- (next.south -| b17) node[anchor=north,align=center,font=\footnotesize] {MSB is zero,\\so this is the last byte};
+\draw[<-] ([yshift=-2pt]b17.south) -- (next.south -| b17) node[anchor=north,align=center,font=\footnotesize] {MSB is zero,\\so this \emph{is} the last byte};
 
 \draw [
     thick,
@@ -295,5 +295,12 @@ $ git bundle create polyglot.pdf --all
 \end{minipage}
 \endgroup
 \end{center}
+Any vanilla, un-patched version of git will be able to clone a repo
+from the bundle. It will also be a valid PDF, since virtually all
+PDF readers ignore garbage bytes before and after the PDF.
+
+\section{Generalizing the PoC}
+
+There are, of course, some 
 
 \end{document}
