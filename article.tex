@@ -372,18 +372,18 @@ we need to do is move all of the DEFLATE headers that zlib created to
 different positions that won't corrupt the PDF, and update their
 lengths accordingly.
 
-So, where can we put a 5-byte DEFLATE header such that it won't
-corrupt the PDF? We could use our standard trick of putting it in a
-PDF object stream that we've exploited countless times before to
-enable PoC$\|$GTFO polyglots. The trouble with that is that object
-streams are fixed-length, so once the PDF is decompressed
-(\textit{i.e.},~when a repo is cloned from the git bundle), then all
-of the 5-byte DEFLATE headers will disappear and the object stream
-lengths would all be incorrect. Instead, I chose to use PDF comments,
-which start at any occurrence of the percent sign character~(\%)
-outside a string or stream and continue until the first occurrence of
-a newline.  All of the PDF viewers I tested don't seem to care if
-comments include non-ASCII characters; they seem to simply scan for a
+Where can we put a 5-byte DEFLATE header such that it won't corrupt
+the PDF? We could use our standard trick of putting it in a PDF object
+stream that we've exploited countless times before to enable
+PoC$\|$GTFO polyglots. The trouble with that is that object streams
+are fixed-length, so once the PDF is decompressed (\textit{i.e.},~when
+a repo is cloned from the git bundle), then all of the 5-byte DEFLATE
+headers will disappear and the object stream lengths would all be
+incorrect. Instead, I chose to use PDF comments, which start at any
+occurrence of the percent sign character~(\%) outside a string or
+stream and continue until the first occurrence of a newline.  All of
+the PDF viewers I tested don't seem to care if comments include
+non-ASCII characters; they seem to simply scan for a
 newline. Therefore, we can inject ``\texttt{\%\textbackslash n}''
 between PDF objects and move the DEFLATE headers there. The only
 caveat is that the DEFLATE header itself can't contain a newline
@@ -397,5 +397,69 @@ multiple of 5, due to the removed DEFLATE headers. Fortunately, most
 PDF readers can gracefully handle incorrect Xref offsets (at the
 expense of a slower loading time), and this will only affect the PDF
 contained in the repository, \emph{not} the PDF polyglot.
+
+As a final step, we need to update the SHA-1 sum at the end of the
+packfile~(\textit{q.v.}~Section~\ref{sec:GitBundleFormat}), since we
+moved the locations of the DEFLATE headers, thus affecting the hash.
+
+At this point, we have all the tools necessary to create a generalized
+PDF/Git Bundle polyglot for \emph{almost} any PDF and git
+repository. The only remaining hurdle is that some viewers require
+that the PDF occur as early in the packfile as possible. At first, I
+considered applying another patch directly the git source code to make
+the uncompressed object first in the packfile. This approach proved to
+be very involved, in part due to git's UNIX design philosophy and
+architecture of generic code reuse. We're already updating the
+packfile's SHA-1 hash due to changing the DEFLATE headers, so instead
+I decided to simply reorder the objects after-the-fact, subsequent to
+the DEFLATE header fix but before we update the hash. The only
+challenge is that moving objects in the packfile has the potential to
+break offset delta objects, since they refer to their base objects via
+a byte offset within the packfile.  Moving the PDF to the beginning
+will break any offset delta objects that occur after the original
+position of the PDF which refer to base objects that occur before the
+original position of the PDF. That's why I had to dive deeper into the
+rabbit hole of the packfile format to understand the delta object
+headers (as you saw at the end of Section~\ref{sec:GitBundleFormat},
+if you were brave enough to finish it), since I originally attempted
+to rewrite the broken ones. Rewriting the broken offset delta objects
+is the \emph{correct} solution, but, in the end, I discovered a much
+simpler way.
+
+\begin{center}
+\begin{tikzpicture}
+\node at (0,0) (text) {\begin{minipage}{0.8\hsize}\small
+As a matter of fact, G-d just questioned my judgement. He said,
+`Terry, are you worthy to be the man who makes the temple? If you are,
+you must answer: Is this [dastardly], or is this divine intellect?'
+\end{minipage}};
+\node[anchor=north east] at (text.north west) {\LARGE``};
+\node[anchor=south west] at (text.south east) {\LARGE''};
+\node[anchor=north east] at (text.south east) (terry) {\setbox9=\hbox{\llap{---}Terry A.\ Davis, creator of TempleOS}\parbox{\wd9}{\raggedright\box9 self-proclaimed ``smartest programmer that's ever lived''}};
+\end{tikzpicture}
+\end{center}
+
+In the previous section, recall that we created the minimal PoC by
+patching the command line arguments to \texttt{pack-objects}.  One of
+the command line arguments that is already passed by default
+is \texttt{--delta-base-offset}. Running \texttt{git help
+pack-objects} reveals the following:
+\begin{center}
+{\footnotesize\setbox9\hbox{\verb|A packed archive can express the base object of a delta as either a|}
+\begin{minipage}{\wd9}
+\begin{verbatim}
+A packed archive can express the base object of a delta as either a
+20-byte object name or as an offset in the stream, but ancient
+versions of Git don't understand the latter. By default, git
+pack-objects only uses the former format for better compatibility.
+This option allows the command to use the latter format for
+compactness. Depending on the average delta chain length, this
+option typically shrinks the resulting packfile by 3-5 per-cent.
+\end{verbatim}
+\end{minipage}}
+\end{center}
+So all we need to do is \emph{remove} the \texttt{--delta-base-offset}
+argument and git will not include any offset delta objects in the
+pack!
 
 \end{document}
