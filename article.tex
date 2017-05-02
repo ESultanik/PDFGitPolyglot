@@ -123,9 +123,10 @@ node (#1label) [pos=0.5,anchor=north,yshift=-2pt]}
 \end{center}
 
 I hope you like Soviet holes, dear neighbor, because chasing this
-rabbit might remind you of \includegraphics{kolskaya}. If you
-grew bored reading Tristram Shandy, it's safe to skip to the next
-section, 'cause it's turtles all the way down.
+rabbit might remind you of \includegraphics{kolskaya}. I think it is
+useful to describe the git packfile format here, since it is not well
+documented elsewhere. If that doesn't interest you, it's safe to skip
+to the next section.
 
 \begin{center}
 \includegraphics[width=0.5\hsize]{RazvodityeKrolikov_small}
@@ -133,12 +134,12 @@ section, 'cause it's turtles all the way down.
 
 Okay, the next step is to figure out the ``chunk'' format.  The chunk
 header is variable length, and can be as small as one byte. It encodes
-the type of object and the \emph{uncompressed} size of the object. If
-the object is a \textit{delta} (\textit{i.e.}, a diff, as opposed to a
-complete object), the header is followed by either the SHA-1 hash of
-the base object to which the delta should be applied, or a byte
-reference within the packfile for the start of the base object. The
-remainder of the chunk consists of the object data, zlib-compressed.
+the object's type and its \emph{uncompressed} size. If the object is
+a \textit{delta} (\textit{i.e.}, a diff, as opposed to a complete
+object), the header is followed by either the SHA-1 hash of the base
+object to which the delta should be applied, or a byte reference
+within the packfile for the start of the base object. The remainder of
+the chunk consists of the object data, zlib-compressed.
 
 This is the format of the variable length chunk header:
 \begin{center}
@@ -234,12 +235,31 @@ node [pos=0.5,yshift=-2pt,anchor=north,align=center,font=\footnotesize] {the nex
 
 \end{tikzpicture}}
 \end{center}
-This example header represents an object of type \texttt{0b011}, which
-happens to be a git blob, and an \emph{uncompressed} length of
-$(100_2\,\verb|<<|\,14) +
-(1010110_2\,\verb|<<|\,7) + 1001001_2
-= 76617$ bytes.  Since this is not a delta object, it is immediately
-followed by the zlib-compressed object data.
+The second through fourth most significant bits of the first byte are
+used to store the object type. The remainder of the bytes in the
+header are of the same format as bytes two and three in this
+example. This example header represents an object of type $11_2$,
+which happens to be a git blob, and an \emph{uncompressed} length of
+$(100_2\,\verb|<<|\,14) + (1010110_2\,\verb|<<|\,7) + 1001001_2 =
+76617$ bytes.  Since this is not a delta object, it is immediately
+followed by the zlib-compressed object data. The header does not
+encode the \emph{compressed} size of the object, since the DEFLATE
+encoding can determine the end of the object as it is being
+decompressed.
+
+At this point, if you found The Life and Opinions of Tristram Shandy
+to be boring or frustrating, then it's probably best to skip to the
+next section, 'cause it's turtles all the way down.
+
+{\fontfamily{jkpvos}\selectfont\begin{center}
+\begin{tikzpicture}
+\node at (0,0) (text) {\begin{minipage}{0.8\hsize}\small
+To come at the exact weight of things= in the scientific steel-yard, the fulchrum, [Walter Shandy] would say, should be almost invisible, to avoid all friction from popular tenets=,---without this= the minutiae of philosophy, which should always= turn the balance, will have no weight at all---Knowledge, like matter, he would affirm, was= divisible in infinitum---that the grains= and scruples= were as= much a part of it, as= the gravitation of the whole world.
+\end{minipage}};
+\node[anchor=north east] at (text.north west) {\LARGE``};
+\node[anchor=south west] at (text.south east) {\LARGE''};
+\end{tikzpicture}
+\end{center}}
 
 %% TODO: Talk about the Delta Ref file format
 
