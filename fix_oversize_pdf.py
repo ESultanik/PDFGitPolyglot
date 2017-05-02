@@ -33,17 +33,17 @@ def parse_obj(pdf_content, logger = None):
             logger("Error: did not find end of PDF \"%s\"!\n" % line)
     return None, None
 
-def calculate_deflate_locations(objects, additional_bytes = 0):
+def calculate_deflate_locations(objects, last_location = 0):
     if not objects:
         return []
-    length = additional_bytes
     for i, obj in enumerate(objects):
         # should we put a deflate header before object i?
-        start, l = obj
-        last = (i == len(objects) - 1)
-        if length + l + [len("%% "),0][last] + 5 > 0xFFFF:
-            return [i] + map(lambda j : j+i, calculate_deflate_locations(objects[i:], additional_bytes = 1))
-        length += l
+        if i == len(objects) - 1:
+            next_location = obj[0] + obj[1]
+        else:
+            next_location = objects[i+1][0]
+        if next_location - last_location + 9 > 0xFFFF:
+            return [i] + map(lambda j : j+i, calculate_deflate_locations(objects[i:], last_location = obj[0]))
     return []
 
 PDF_HEADER = r"%PDF-1.\d\s*\n%\xD0\xD4\xC5\xD8\s*\n"
