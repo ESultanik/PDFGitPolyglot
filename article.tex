@@ -74,9 +74,10 @@ it's relatively straightforward:
   \node[draw,rounded corners,fill=white] at (pack.south) {\footnotesize Git Packfile};
 \end{tikzpicture}
 \end{center}
-Git uses its Packfile format to compress the objects in its database,
-as well as to reduce network bandwidth when pushing and pulling, which
-makes it an obvious choice for use inside bundles. This of course
+Git has another custom format called a \emph{Packfile} that it uses to
+compress the objects in its database, as well as to reduce network
+bandwidth when pushing and pulling. The packfile is therefore an
+obvious choice for storing objects inside bundles. This of course
 raises the question: What is the format for a Git Packfile?
 
 Git does have some internal documentation in
@@ -375,9 +376,9 @@ lengths accordingly.
 Where can we put a 5-byte DEFLATE header such that it won't corrupt
 the PDF? We could use our standard trick of putting it in a PDF object
 stream that we've exploited countless times before to enable
-PoC$\|$GTFO polyglots. The trouble with that is that object streams
-are fixed-length, so once the PDF is decompressed (\textit{i.e.},~when
-a repo is cloned from the git bundle), then all of the 5-byte DEFLATE
+PoC$\|$GTFO polyglots. The trouble with that is: Object streams are
+fixed-length, so once the PDF is decompressed (\textit{i.e.},~when a
+repo is cloned from the git bundle), then all of the 5-byte DEFLATE
 headers will disappear and the object stream lengths would all be
 incorrect. Instead, I chose to use PDF comments, which start at any
 occurrence of the percent sign character~(\%) outside a string or
@@ -417,7 +418,7 @@ challenge is that moving objects in the packfile has the potential to
 break offset delta objects, since they refer to their base objects via
 a byte offset within the packfile.  Moving the PDF to the beginning
 will break any offset delta objects that occur after the original
-position of the PDF which refer to base objects that occur before the
+position of the PDF that refer to base objects that occur before the
 original position of the PDF. That's why I had to dive deeper into the
 rabbit hole of the packfile format to understand the delta object
 headers (as you saw at the end of Section~\ref{sec:GitBundleFormat},
