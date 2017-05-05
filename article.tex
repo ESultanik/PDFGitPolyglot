@@ -289,7 +289,7 @@ spawns a new \texttt{git} child process to execute each of those
 subcommands. Likewise, the \texttt{git bundle} command spawns
 a \texttt{git pack-objects} child process to generate the packfile
 portion of the bundle.  All we need to do is inject
-the \texttt{--compression=0} argument into the list of command line
+the \texttt{-\relax-compression=0} argument into the list of command line
 arguments passed to \texttt{pack-objects}.  This is a one-line
 addition to \texttt{bundle.c}:\\ {\footnotesize {\color{gray}
 \verb|    argv_array_pushl(&pack_objects.args,|\\
