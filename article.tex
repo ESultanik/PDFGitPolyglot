@@ -264,7 +264,68 @@ To come at the exact weight of things= in the scientific steel-yard, the fulchru
 \end{tikzpicture}
 \end{center}}
 
-%% TODO: Talk about the Delta Ref file format
+There are two types of delta objects: \emph{references}~(object
+type~7) and \emph{offsets}~(object type~6).  Reference delta objects
+contain an additional 20~bytes at the end of the header before the
+zlib-compressed delta data. These 20~bytes contain the SHA-1 hash of
+the base object to which the delta should be applied.  Offset delta
+objects are exactly the same, however, instead of referencing the base
+object by its SHA-1 hash, it is instead represented by a negative byte
+offset to the start of the object within the pack file.  Since a
+negative byte offset can typically be encoded in two or three bytes,
+it's significantly smaller than a 20-byte SHA-1 hash.  One must
+understand how these offset delta objects are encoded if---say, for
+some strange, masochistic reason---one wanted to change the order of
+objects within a packfile, since doing so would break the negative
+offsets. (Foreshadowing!)
+
+One would
+\emph{think} that git would use the same multi-byte length encoding that they
+used for the uncompressed object length.  But no! This is what we have
+to go off of from the git documentation:
+\begin{center}
+\begingroup
+\setbox9=\hbox{\footnotesize\verb|for n >= 2 adding 2^7 + 2^14 + ... + 2^(7*(n-1))|}
+\begin{minipage}{\wd9}
+\footnotesize\begin{verbatim}
+n bytes with MSB set in all but the last one.
+The offset is then the number constructed by
+concatenating the lower 7 bit of each byte, and
+for n >= 2 adding 2^7 + 2^14 + ... + 2^(7*(n-1))
+to the result.
+\end{verbatim}
+\end{minipage}
+\endgroup
+\end{center}
+Right. Some experimenting resulted in the following decoding logic
+that appears to work:
+\begin{center}
+\begingroup
+\setbox9=\hbox{\footnotesize\verb|        reference += (1 << (7 * (bytes_read - 1)))|}
+\begin{minipage}{\wd9}
+\footnotesize
+{\color{blue}\verb|def|}\verb| decode_obj_ref|{\color{gray}\verb|(|}\verb|data|{\color{gray}\verb|):|}\\
+\verb|    bytes_read = 0|\\
+\verb|    reference = 0|\\
+\verb|    |{\color{blue}\verb|for|}\verb| c |{\color{blue}\verb|in map|}{\color{gray}\verb|(|}\verb|ord, data|{\color{gray}\verb|):|}\\
+\verb|        bytes_read += 1|\\
+\verb|        reference <<= 7|\\
+\verb|        reference += c & 0b01111111|\\
+\verb|        |{\color{blue}\verb|if not|}\verb| |{\color{gray}\verb|(|}\verb|c & 0b10000000|{\color{gray}\verb|):|}\\
+{\color{blue}\verb|            break|}\\
+{\color{blue}\verb|    if|}\verb| bytes_read >= 2|{\color{gray}\verb|:|}\\
+\verb|        reference += |{\color{gray}\verb|(|}\verb|1 << |{\color{gray}\verb|(|}\verb|7 * |{\color{gray}\verb|(|}\verb|bytes_read - 1|{\color{gray}\verb|)))|}\\
+\verb|    return reference, bytes_read|\\
+\end{minipage}
+\endgroup
+\end{center}
+
+The rabbit hole is deeper still; we haven't yet discovered the content
+of the compressed delta objects, let alone how they are applied to
+base objects.  At this point, we have more than sufficient knowledge
+to proceed with the PoC, and my canary died ages ago. Aditya Mukerjee
+did a good job of explaining the process of applying deltas in his
+blog post, so I will stop here and proceed with the polyglot.
 
 \section{A Minimal Polyglot PoC}
 
