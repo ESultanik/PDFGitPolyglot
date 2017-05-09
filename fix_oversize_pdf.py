@@ -88,7 +88,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
     logger("Parsed %d PDF objects.\n" % len(objects))
     locations = calculate_deflate_locations(objects)
     first_block_size = len(pdf_content[start_offset:])
-    block_offsets = [[-5, first_block_size]]
+    block_offsets = [[-5, first_block_size, 0]]
     if not locations:
         logger("The PDF doesn't need fixing!\n")
         return block_offsets
@@ -99,22 +99,48 @@ def fix_pdf(pdf_content, output = None, logger = None):
         else:
             last = False
             length = objects[locations[idx+1]][0] - objects[i][0]
-        length += 1 # We always have to add a newline to end the comment
+        extra_bytes = 1 # We always have to add a newline to end the comment
         if idx < len(locations) - 1:
             # We need to add three more bytes for the '%% ' before the next deflate block header:
-            length += 3
-        extra_bytes = bytes_to_inject(length)
+            extra_bytes += 3
+        extra_bytes += bytes_to_inject(length + extra_bytes)
         length += extra_bytes
         if idx == 0:
             block_offsets[0][1] = objects[i][0] + 3 # +3 for the leading '%% '
-        block_offsets.append([objects[i][0] + 5*idx + 3, length]) # 5*idx is to account for the previously added 5-byte DEFLATE block headers, +3 for the leading '%% '
+        block_offsets.append([objects[i][0] + 5*idx + 3, length, extra_bytes]) # 5*idx is to account for the previously added 5-byte DEFLATE block headers, +3 for the leading '%% '
         logger("Inserting %s DEFLATE header comment for a %d byte block with %d extra bytes before existing object #%d...\n" % (["a", "the last"][last], length - extra_bytes, extra_bytes, i+1))
         new_obj = "%%%% %s\n" % (' ' * extra_bytes)
         pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
         for j in range(i,len(objects)):
             objects[j] = (objects[j][0] + len(new_obj), objects[j][1])
-    # TODO: Fix the xrefs!
-    output.write(pdf_content)
+    # Fix the xrefs:
+    pdf = pdf_content.splitlines(True)
+    xrefoff = pdf.index("xref\n")
+    startxrefoff = pdf[xrefoff:].index("startxref\n")
+    nxref = int(pdf[xrefoff+1].split(" ")[1])
+    output.write("".join(pdf[:xrefoff+3]))
+    pdf = pdf[xrefoff+3:]
+    offset = 0
+    block_idx = 0
+    xref_len_diff = 0
+    for i in range(nxref-1):
+        ref = pdf[0].split(" ")
+        idx = int(ref[0])
+        while block_idx < len(block_offsets) and block_offsets[block_idx][0] - offset <= idx:
+            #offset += block_offsets[block_idx-1][2]
+            block_idx += 1
+        fixed_offset = "%010i" % (idx + offset)
+        xref_len_diff += len(fixed_offset) - len(ref[0])
+        ref[0] = fixed_offset
+        output.write(" ".join(ref))
+        pdf.pop(0)
+    print "%d bytes added to the last block due to the xref fixes" % xref_len_diff
+    block_offsets[-1][1] += xref_len_diff
+    xrefoff = pdf.index("startxref\n")
+    output.write("".join(pdf[:xrefoff+1]))
+    output.write("%i\n" % (int(pdf[xrefoff+1]) + offset))
+    pdf=pdf[xrefoff+2:]
+    output.write("".join(pdf))
     return block_offsets
 
 if __name__ == "__main__":

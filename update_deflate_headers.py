@@ -213,7 +213,7 @@ def update_deflate_headers(pdf_content, output, block_offsets):
     print "Updating the injected DEFLATE headers..."
     for idx, block in enumerate(block_offsets[1:]):
         last = (idx == len(block_offsets) - 2)
-        offset, length = block
+        offset, length, added_bytes = block
         print "Injecting DEFLATE header at offset 0x%x for a %d byte block" % (pdf_header_offset + offset, length)
         # Sanity check: the injection position should be preceeded by a PDF comment
         assert pdf_content[pdf_header_offset + offset - 3:pdf_header_offset + offset] == '%% '
