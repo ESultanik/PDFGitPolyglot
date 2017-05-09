@@ -76,6 +76,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
             break
     if start_offset is None:
         raise Exception("Did not find PDF header!")
+    original_pdf = pdf_content
     objects = []
     while True:
         start, length = parse_obj(pdf_content[offset:], logger = logger)
@@ -123,6 +124,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
     pdf = pdf[xrefoff+3:]
     xref_len_diff = 0
     for i in range(nxref-1):
+        assert len(pdf[0]) == 20 # xref entries must be exactly 20 bytes long, including newlines
         ref = pdf[0].split(" ")
         idx = int(ref[0])
         offset = 0
@@ -132,9 +134,12 @@ def fix_pdf(pdf_content, output = None, logger = None):
             block_idx += 1
         sys.stdout.write("Increasing xref %d by %d bytes to %d\n" % (i, offset, idx + offset))
         fixed_offset = "%010i" % (idx + offset)
+        #assert pdf_content[start_offset + idx + offset/9*4:start_offset + idx + offset/9*4+20] == original_pdf[start_offset + idx:start_offset + idx + 20]
         xref_len_diff += len(fixed_offset) - len(ref[0])
         ref[0] = fixed_offset
-        output.write(" ".join(ref))
+        new_xref = " ".join(ref)
+        assert len(new_xref) == 20
+        output.write(new_xref)
         pdf.pop(0)
     #print "%d bytes added to the last block due to the xref fixes" % xref_len_diff
     block_offsets[-1][1] += xref_len_diff
