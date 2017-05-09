@@ -145,7 +145,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
     block_offsets[-1][1] += xref_len_diff
     xrefoff = pdf.index("startxref\n")
     output.write("".join(pdf[:xrefoff+1]))
-    output.write("%i\n" % (int(pdf[xrefoff+1]) + offset))
+    output.write("%i\n" % (int(pdf[xrefoff+1]) + offset + xref_len_diff))
     pdf=pdf[xrefoff+2:]
     output.write("".join(pdf))
     return block_offsets
