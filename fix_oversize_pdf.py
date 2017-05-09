@@ -122,7 +122,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
     output.write("".join(pdf[:xrefoff+3]))
     pdf = pdf[xrefoff+3:]
     offset = 0
-    block_idx = 0
+    block_idx = 1
     xref_len_diff = 0
     for i in range(nxref-1):
         ref = pdf[0].split(" ")
