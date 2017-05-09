@@ -105,7 +105,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
             injected_length += 3
         extra_bytes = bytes_to_inject(length + injected_length)
         injected_length += extra_bytes
-        length += extra_bytes
+        length += injected_length
         if idx == 0:
             block_offsets[0][1] = objects[i][0] + 3 # +3 for the leading '%% '
         block_offsets.append([objects[i][0] + 5*idx + 3, length, injected_length]) # 5*idx is to account for the previously added 5-byte DEFLATE block headers, +3 for the leading '%% '
@@ -135,7 +135,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
         ref[0] = fixed_offset
         output.write(" ".join(ref))
         pdf.pop(0)
-    print "%d bytes added to the last block due to the xref fixes" % xref_len_diff
+    #print "%d bytes added to the last block due to the xref fixes" % xref_len_diff
     block_offsets[-1][1] += xref_len_diff
     xrefoff = pdf.index("startxref\n")
     output.write("".join(pdf[:xrefoff+1]))

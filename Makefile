@@ -35,7 +35,7 @@ article.pdf : article.tex RazvodityeKrolikov_small.jpg kolskaya.pdf
 	convert $< -define jpeg:extent=63kb $@
 
 %_injected.pdf %.pdf.block_offsets : %.pdf fix_oversize_pdf.py
-	python fix_oversize_pdf.py $*.pdf $@
+	python fix_oversize_pdf.py $*.pdf $*_injected.pdf
 
 %_bundle.pdf : %_injected.pdf %.pdf.block_offsets git/git update_deflate_headers.py
 	./make_polyglot.sh $*_injected.pdf $@
