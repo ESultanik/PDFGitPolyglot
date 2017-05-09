@@ -92,6 +92,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
     if not locations:
         logger("The PDF doesn't need fixing!\n")
         return block_offsets
+    original_block_offsets = [-5] + map(lambda i : objects[i][0], locations)
     for idx, i in enumerate(locations):
         if idx >= len(locations) - 1:
             last = True
@@ -99,16 +100,15 @@ def fix_pdf(pdf_content, output = None, logger = None):
         else:
             last = False
             length = objects[locations[idx+1]][0] - objects[i][0]
-        injected_length = 1 # We always have to add a newline to end the comment
+        length += 1 # We always have to add a newline to end the comment
         if idx < len(locations) - 1:
             # We need to add three more bytes for the '%% ' before the next deflate block header:
-            injected_length += 3
-        extra_bytes = bytes_to_inject(length + injected_length)
-        injected_length += extra_bytes
-        length += injected_length
+            length += 3
+        extra_bytes = bytes_to_inject(length)
+        length += extra_bytes
         if idx == 0:
             block_offsets[0][1] = objects[i][0] + 3 # +3 for the leading '%% '
-        block_offsets.append([objects[i][0] + 5*idx + 3, length, injected_length]) # 5*idx is to account for the previously added 5-byte DEFLATE block headers, +3 for the leading '%% '
+        block_offsets.append([objects[i][0] + 5*idx + 3, length, 9 + extra_bytes]) # 5*idx is to account for the previously added 5-byte DEFLATE block headers, +3 for the leading '%% '
         logger("Inserting %s DEFLATE header comment for a %d byte block with %d extra bytes before existing object #%d...\n" % (["a", "the last"][last], length - extra_bytes, extra_bytes, i+1))
         new_obj = "%%%% %s\n" % (' ' * extra_bytes)
         pdf_content = pdf_content[:objects[i][0]] + new_obj + pdf_content[objects[i][0]:]
@@ -121,15 +121,16 @@ def fix_pdf(pdf_content, output = None, logger = None):
     nxref = int(pdf[xrefoff+1].split(" ")[1])
     output.write("".join(pdf[:xrefoff+3]))
     pdf = pdf[xrefoff+3:]
-    offset = 0
-    block_idx = 1
     xref_len_diff = 0
     for i in range(nxref-1):
         ref = pdf[0].split(" ")
         idx = int(ref[0])
-        while block_idx < len(block_offsets) and block_offsets[block_idx][0] - start_offset - offset <= idx:
+        offset = 0
+        block_idx = 1
+        while block_idx < len(block_offsets) and original_block_offsets[block_idx] <= idx:
             offset += block_offsets[block_idx][2]
             block_idx += 1
+        sys.stdout.write("Increasing xref %d by %d bytes to %d\n" % (i, offset, idx + offset))
         fixed_offset = "%010i" % (idx + offset)
         xref_len_diff += len(fixed_offset) - len(ref[0])
         ref[0] = fixed_offset
