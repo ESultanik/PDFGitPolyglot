@@ -7,10 +7,13 @@ endif
 .PHONY : all
 all : article_bundle.pdf
 
-.PHONY : clean
-clean : git-submodule
-	$(MAKE) -C git clean
+.PHONY : local-clean
+local-clean :
 	rm -f article_bundle.pdf article.pdf article.log article.aux *~ RazvodityeKrolikov_small.jpg kolskaya.pdf
+
+.PHONY : clean
+clean : git-submodule local-clean
+	$(MAKE) -C git clean
 
 .PHONY : git-submodule
 git-submodule :
