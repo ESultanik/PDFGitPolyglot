@@ -128,7 +128,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
         ref = pdf[0].split(" ")
         idx = int(ref[0])
         while block_idx < len(block_offsets) and block_offsets[block_idx][0] - offset <= idx:
-            #offset += block_offsets[block_idx-1][2]
+            offset += block_offsets[block_idx-1][2]
             block_idx += 1
         fixed_offset = "%010i" % (idx + offset)
         xref_len_diff += len(fixed_offset) - len(ref[0])
