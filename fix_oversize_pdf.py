@@ -127,7 +127,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
         idx = int(ref[0])
         offset = 0
         block_idx = 1
-        while block_idx < len(block_offsets) and original_block_offsets[block_idx] <= idx:
+        while block_idx < len(block_offsets) and original_block_offsets[block_idx] - start_offset <= idx:
             offset += block_offsets[block_idx][2]
             block_idx += 1
         sys.stdout.write("Increasing xref %d by %d bytes to %d\n" % (i, offset, idx + offset))
