@@ -527,6 +527,57 @@ So all we need to do is \emph{remove} the \texttt{--delta-base-offset}
 argument and git will not include any offset delta objects in the
 pack!
 
+\thindivider
+
+Okay, I have to admit something: There is one more challenge. You see,
+the latest PDF standard, ISO~32000-1:2008, says
+\begin{center}
+\begin{tikzpicture}
+\node at (0,0) (text) {\begin{minipage}{0.8\hsize}\small
+The \emph{trailer} of a PDF file enables a conforming reader to
+quickly find the cross-reference table and certain special
+objects. Conforming readers should read a PDF file from its end. The
+last line of the file shall contain only the end-of-file
+marker, \texttt{\%\%EOF}.
+\end{minipage}};
+\node[anchor=north east] at (text.north west) {\LARGE``};
+\node[anchor=south west] at (text.south east) {\LARGE''};
+\end{tikzpicture}
+\end{center}
+Granted, we are producing a PDF that conforms to version~1.4 of the
+specification, which doesn't appear to have that requirement.
+However, at least as early as version 1.3, the specification did have
+an implementation note that Acrobat requires the \texttt{\%\%EOF} to
+be within the last 1024 bytes of the file.  Either way, that's not
+guaranteed to be the case for us, especially since we are moving the
+PDF to be at the beginning of the packfile.  There are almost
+certainly going to be trailing bytes after the PDF's \texttt{\%\%EOF},
+and if the git repository is large, those are likely to be more than
+1024 bytes.
+
+Fortunately, most common PDF readers don't seem to care how many
+trailing bytes there are, at least when the PDF is version~1.4.
+Unfortunately, some readers such as Adobe's try to be ``helpful,''
+silently ``fixing'' the problem and offering to save the fixed version
+upon exit.  We can at least partially fix the PDF, ensuring that
+the \texttt{\%\%EOF} is exactly 20 bytes of the end of the file, by
+creating a second uncompressed git object as the very end of the
+packfile (right before the final 20~byte SHA-1 checksum).  We could
+then move the trailer from the end of the original PDF at the start of
+the pack to the new git object at the end of the pack.  Finally, we
+could encapsulate the ``middle'' objects of the packfile inside a PDF
+stream object, such that they are ignored by the PDF.  The tricky part
+is that we would have to know how many bytes will be in that
+stream \emph{before} we add the PDF to the git database.  That's
+theoretically possible to do \textit{a priori}, but it'd be very labor
+intensive to pull off.  Furthermore, using this approach will
+completely break the inner PDF that is produced by cloning the
+repository, since its trailer will then be in a separate file.
+Therefore, I chose to live with Adobe's helpfulness and not pursue
+this fix for the PoC.
+
+\thindivider
+
 This PDF is a git bundle containing its \LaTeX\ source, as well as all
 of the code necessary to regenerate this polyglot.
 
