@@ -551,10 +551,10 @@ However, at least as early as version 1.3, the specification did have
 an implementation note that Acrobat requires the \texttt{\%\%EOF} to
 be within the last 1024 bytes of the file.  Either way, that's not
 guaranteed to be the case for us, especially since we are moving the
-PDF to be at the beginning of the packfile.  There are almost
-certainly going to be trailing bytes after the PDF's \texttt{\%\%EOF},
-and if the git repository is large, those are likely to be more than
-1024 bytes.
+PDF to be at the beginning of the packfile.  There are always going to
+be at least 20 trailing bytes after the PDF's \texttt{\%\%EOF} (namely
+the packfile's final SHA-1 checksum), and if the git repository is
+large, there are likely to be more than 1024 bytes.
 
 Fortunately, most common PDF readers don't seem to care how many
 trailing bytes there are, at least when the PDF is version~1.4.
