@@ -45,3 +45,4 @@ article.pdf : article.tex RazvodityeKrolikov_small.jpg kolskaya.pdf
 	mv $@ $@.polyglot
 	./update_deflate_headers.py $@.polyglot $@ $*.pdf.block_offsets
 	rm $@.polyglot
+	./verify_xrefs.py $@
