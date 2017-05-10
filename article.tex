@@ -469,24 +469,25 @@ At this point, we have all the tools necessary to create a generalized
 PDF/Git Bundle polyglot for \emph{almost} any PDF and git
 repository. The only remaining hurdle is that some viewers require
 that the PDF occur as early in the packfile as possible. At first, I
-considered applying another patch directly the git source code to make
-the uncompressed object first in the packfile. This approach proved to
-be very involved, in part due to git's UNIX design philosophy and
-architecture of generic code reuse. We're already updating the
-packfile's SHA-1 hash due to changing the DEFLATE headers, so instead
-I decided to simply reorder the objects after-the-fact, subsequent to
-the DEFLATE header fix but before we update the hash. The only
-challenge is that moving objects in the packfile has the potential to
-break offset delta objects, since they refer to their base objects via
-a byte offset within the packfile.  Moving the PDF to the beginning
-will break any offset delta objects that occur after the original
-position of the PDF that refer to base objects that occur before the
-original position of the PDF. That's why I had to dive deeper into the
-rabbit hole of the packfile format to understand the delta object
-headers (as you saw at the end of Section~\ref{sec:GitBundleFormat},
-if you were brave enough to finish it), since I originally attempted
-to rewrite the broken ones. Rewriting the broken offset delta objects
-is the \emph{correct} solution, but, in the end, I discovered a much
+considered applying another patch directly to the git source code to
+make the uncompressed object first in the packfile. This approach
+proved to be very involved, in part due to git's UNIX design
+philosophy and architecture of generic code reuse. We're already
+updating the packfile's SHA-1 hash due to changing the DEFLATE
+headers, so instead I decided to simply reorder the objects
+after-the-fact, subsequent to the DEFLATE header fix but before we
+update the hash. The only challenge is that moving objects in the
+packfile has the potential to break offset delta objects, since they
+refer to their base objects via a byte offset within the packfile.
+Moving the PDF to the beginning will break any offset delta objects
+that occur after the original position of the PDF that refer to base
+objects that occur before the original position of the PDF. I
+originally attempted to rewrite the broken offset delta objects, which
+is why I had to dive deeper into the rabbit hole of the packfile
+format to understand the delta object headers (as you saw at the end
+of Section~\ref{sec:GitBundleFormat}, if you were brave enough to
+finish it). Rewriting the broken offset delta objects is
+the \emph{correct} solution, but, in the end, I discovered a much
 simpler way.
 
 \begin{center}
