@@ -508,7 +508,7 @@ Terry's not the only one who's written a compiler!
 In the previous section, recall that we created the minimal PoC by
 patching the command line arguments to \texttt{pack-objects}.  One of
 the command line arguments that is already passed by default
-is \texttt{--delta-base-offset}. Running \texttt{git help
+is \texttt{-{}-delta-base-offset}. Running \texttt{git help
 pack-objects} reveals the following:
 \begin{center}
 {\footnotesize\setbox9\hbox{\verb|A packed archive can express the base object of a delta as either a|}
@@ -524,7 +524,7 @@ option typically shrinks the resulting packfile by 3-5 per-cent.
 \end{verbatim}
 \end{minipage}}
 \end{center}
-So all we need to do is \emph{remove} the \texttt{--delta-base-offset}
+So all we need to do is \emph{remove} the \texttt{-{}-delta-base-offset}
 argument and git will not include any offset delta objects in the
 pack!
 
