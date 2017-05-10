@@ -21,6 +21,8 @@ def verify_xrefs(pdf_bytes):
         tmp.write(pdf_bytes[pdf_header_offset:])
         tmp.flush()
         subprocess.check_call(["/usr/bin/env", "qpdf", "-qdf", tmp.name, '-'], stdout=FNULL)
+    print "PDF appears to be valid."
+    return True
         
 if __name__ == "__main__":
     import sys
