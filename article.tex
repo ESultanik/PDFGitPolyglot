@@ -560,7 +560,7 @@ trailing bytes there are, at least when the PDF is version~1.4.
 Unfortunately, some readers such as Adobe's try to be ``helpful,''
 silently ``fixing'' the problem and offering to save the fixed version
 upon exit.  We can at least partially fix the PDF, ensuring that
-the \texttt{\%\%EOF} is exactly 20 bytes of the end of the file, by
+the \texttt{\%\%EOF} is exactly 20~bytes from the end of the file, by
 creating a second uncompressed git object as the very end of the
 packfile (right before the final 20~byte SHA-1 checksum).  We could
 then move the trailer from the end of the original PDF at the start of
