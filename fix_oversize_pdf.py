@@ -43,7 +43,7 @@ def calculate_deflate_locations(objects, last_location = 0):
         else:
             next_location = objects[i+1][0]
         if next_location - last_location + 9 > 0xFFFF:
-            return [i] + map(lambda j : j+i, calculate_deflate_locations(objects[i:], last_location = obj[0]))
+            return [i] + map(lambda j : j+i+1, calculate_deflate_locations(objects[i+1:], last_location = obj[0]))
     return []
 
 PDF_HEADER = r"%PDF-1.\d\s*\n%\xD0\xD4\xC5\xD8\s*\n"
