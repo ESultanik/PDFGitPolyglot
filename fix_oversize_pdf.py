@@ -11,11 +11,14 @@ def parse_obj(pdf_content, logger = None):
         if line.startswith('%'):
             bytes_skipped += len(line) + 1
             continue
-        m = re.match(r"^\s*\d+\s+\d+\s+obj$", line)
+        m = re.match(r"^(\s*\d+\s+\d+\s+obj\s*)(<<|$)", line)
         if not m:
-            bytes_skipped += len(line) + 1
+            bytes_skipped += len(line) + 1            
             continue
-        after_obj = pdf_content[bytes_skipped+len(line)+1:]
+        if m.group(2):
+            after_obj = pdf_content[bytes_skipped + len(m.group(1)) + 1:]
+        else:
+            after_obj = pdf_content[bytes_skipped+len(line)+1:]
         m = re.match(r"^\s*<<((?!\n\s*>>\s*\n).)*?\/Length\s+(\d+)\s*\n.*?>>.*?stream\n", after_obj, re.MULTILINE | re.DOTALL)
         if m:
             bytes_up_to_endstream = len(m.group(0)) + int(m.group(2))
