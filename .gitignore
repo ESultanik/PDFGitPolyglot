@@ -5,8 +5,8 @@
 *.pyc
 article.pdf
 article.pdf.block_offsets
-article_bundle.pdf
-article_bundle.pdf.polyglot
+PDFGitPolyglot.pdf
+PDFGitPolyglot.pdf.polyglot
 article_injected.pdf
 kolskaya.pdf
 RazvodityeKrolikov_small.jpg

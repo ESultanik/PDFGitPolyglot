@@ -5,7 +5,7 @@ AR=ar
 endif
 
 .PHONY : all
-all : article_bundle.pdf
+all : PDFGitPolyglot.pdf
 
 .PHONY : local-clean
 local-clean :
@@ -40,9 +40,9 @@ article.pdf : article.tex RazvodityeKrolikov_small.jpg kolskaya.pdf
 %_injected.pdf %.pdf.block_offsets : %.pdf fix_oversize_pdf.py
 	python fix_oversize_pdf.py $*.pdf $*_injected.pdf
 
-%_bundle.pdf : %_injected.pdf %.pdf.block_offsets git/git update_deflate_headers.py
-	./make_polyglot.sh $*_injected.pdf $@
+PDFGitPolyglot.pdf : article_injected.pdf article.pdf.block_offsets git/git update_deflate_headers.py
+	./make_polyglot.sh article_injected.pdf $@
 	mv $@ $@.polyglot
-	./update_deflate_headers.py $@.polyglot $@ $*.pdf.block_offsets
+	./update_deflate_headers.py $@.polyglot $@ article.pdf.block_offsets
 	rm $@.polyglot
 	./verify_xrefs.py $@

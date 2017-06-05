@@ -37,13 +37,13 @@ repository.
 \setbox9=\hbox{\footnotesize\verb|Receiving objects: 100% (174/174), 103.48 KiB | 0 bytes/s, done.|}
 \begin{minipage}{\wd9}
 \footnotesize\begin{verbatim}
-$ git clone article.pdf foo
+$ git clone PDFGitPolyglot.pdf foo
 Cloning into 'foo'...
 Receiving objects: 100% (174/174), 103.48 KiB | 0 bytes/s, done.
 Resolving deltas: 100% (100/100), done.
 $ cd foo
 $ ls
-article.pdf article.tex
+PDFGitPolyglot.pdf PDFGitPolyglot.tex
 \end{verbatim}
 \end{minipage}
 \endgroup
@@ -364,14 +364,14 @@ Using our patched version of git, every object stored in the bundle
 will be uncompressed!
 \begin{center}
 \begingroup
-\setbox9=\hbox{\footnotesize\verb|$ git bundle create article_bundle.pdf --all|}
+\setbox9=\hbox{\footnotesize\verb|$ git bundle create PDFGitPolyglot.pdf --all|}
 \begin{minipage}{\wd9}
 \footnotesize\begin{verbatim}
 $ export PATH=/path/to/patched/git:$PATH
 $ git init
 $ git add article.pdf
 $ git commit article.pdf -m "added"
-$ git bundle create polyglot.pdf --all
+$ git bundle create PDFGitPolyglot.pdf --all
 \end{verbatim}
 \end{minipage}
 \endgroup
