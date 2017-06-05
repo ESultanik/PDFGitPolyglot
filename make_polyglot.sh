@@ -53,6 +53,8 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PATH=$DIR/git:$PATH git bundle create ${OUTPUT}.bundle --do-not-compress `git hash-object $OUTPUT` --all 1>>${OUTPUT}.log 2>&1
 echo "Switching back to branch ${CURRENT_BRANCH}..."
 git checkout $CURRENT_BRANCH 1>>${OUTPUT}.log 2>&1
+echo "Deleting ${OUTPUT} from being staged..."
+git rm --cached -f ${OUTPUT}
 echo "Deleting temporary branch ${BRANCH_NAME}..."
 git branch -D $BRANCH_NAME 1>>${OUTPUT}.log 2>&1
 mv ${OUTPUT}.bundle $OUTPUT
