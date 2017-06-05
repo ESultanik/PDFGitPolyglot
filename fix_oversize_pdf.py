@@ -16,9 +16,9 @@ def parse_obj(pdf_content, logger = None):
             bytes_skipped += len(line) + 1
             continue
         after_obj = pdf_content[bytes_skipped+len(line)+1:]
-        m = re.match(r"^\s*<<.*?\/Length\s+(\d+)\s*\n.*?>>.*?stream\n", after_obj, re.MULTILINE | re.DOTALL)
+        m = re.match(r"^\s*<<((?!\n\s*>>\s*\n).)*?\/Length\s+(\d+)\s*\n.*?>>.*?stream\n", after_obj, re.MULTILINE | re.DOTALL)
         if m:
-            bytes_up_to_endstream = len(m.group(0)) + int(m.group(1))
+            bytes_up_to_endstream = len(m.group(0)) + int(m.group(2))
             after_stream = after_obj[bytes_up_to_endstream:]
             m2 = re.match(r".*?\n*endstream\s*\nendobj\s*\n", after_stream, re.MULTILINE | re.DOTALL)
             if not m2:
@@ -82,6 +82,7 @@ def fix_pdf(pdf_content, output = None, logger = None):
         start, length = parse_obj(pdf_content[offset:], logger = logger)
         if start is None:
             break
+        logger("PDF object starting at %d and ending at %d\n" % (offset + start, offset + start + length))
         objects.append((offset + start, length))
         if length > 0xFFFF - 5 - 4:
             raise Exception("The object at PDF offset %d is %d bytes, which is more than the maximum of %d! This PDF cannot be fixed." % (offset + start, length, 0xFFFF - 5 - 4))
