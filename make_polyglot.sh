@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 if [ "$#" -ne 2 ]; then
     (>&2 echo "Usage: $0 SOURCE_PDF OUTPUT_PDF\n")
     exit 1
@@ -54,7 +56,8 @@ PATH=$DIR/git:$PATH git bundle create ${OUTPUT}.bundle --do-not-compress `git ha
 echo "Switching back to branch ${CURRENT_BRANCH}..."
 git checkout $CURRENT_BRANCH 1>>${OUTPUT}.log 2>&1
 echo "Deleting ${OUTPUT} from being staged..."
-git rm --cached -f ${OUTPUT}
+echo "It is normal for the following command to produce an error:" >> ${OUTPUT}.log
+git rm --cached -f ${OUTPUT} 1>>${OUTPUT}.log 2>&1
 echo "Deleting temporary branch ${BRANCH_NAME}..."
 git branch -D $BRANCH_NAME 1>>${OUTPUT}.log 2>&1
 mv ${OUTPUT}.bundle $OUTPUT
