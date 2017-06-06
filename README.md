@@ -28,6 +28,7 @@ The first time you run `make`, the sources to [a patched version of Git](https:/
 * Python 2.7
 * bash
 * ImageMagick
+* qpdf, used by the `verify_xrefs.py` script for sanity checking; this dependency can be removed by commenting out the call to `verify_xrefs.py` in the `Makefile`
 
 ### Caveats
 
