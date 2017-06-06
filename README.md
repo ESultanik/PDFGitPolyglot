@@ -18,6 +18,21 @@ git checkout master && git branch -d PolyglotBranch
 ```
 After that, or if you cloned the repo from elsewhere (*e.g.*, [GitHub](https://github.com/ESultanik/PDFGitPolyglot)), then you will be able to run `make`, which will automatically build `PDFGitPolyglot.pdf` from the document contained in `article.tex`.
 
+The first time you run `make`, the sources to [a patched version of Git](https://github.com/ESultanik/git/tree/UncompressedPack) will be downloaded and compiled. This can be time consuming, so I suggest you use `make -j8`, or whatever is appropriate for your system.
+
+### Dependencies
+
+* a relatively full install of a T<sub><big>E</big></sub> distro, such as [TeX Live](https://www.tug.org/texlive/)
+* autoconf and a C99 compiler for compiling git; I've found that git likes clang more than gcc
+* all of git's sourcecode dependencies (openssl, curl, gettext, *&c.*)
+* Python 2.7
+* bash
+* ImageMagick
+
+### Caveats
+
+The polyglot will fail to build if your document has any PDF objects (*e.g.*, images) that are larger than `0xFFFF` bytes. Read the article for more details.
+
 ### License
 
 Copyright © 2017 [Evan A. Sultanik](https://www.sultanik.com/)
