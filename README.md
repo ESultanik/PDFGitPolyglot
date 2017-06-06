@@ -22,7 +22,7 @@ The first time you run `make`, the sources to [a patched version of Git](https:/
 
 ### Dependencies
 
-* a relatively full install of a T<sub><big>E</big></sub> distro, such as [TeX Live](https://www.tug.org/texlive/)
+* a relatively full install of a T<sub><big>E</big></sub>X distro, such as [TeX Live](https://www.tug.org/texlive/)
 * autoconf and a C99 compiler for compiling git; I've found that git likes clang more than gcc
 * all of git's sourcecode dependencies (openssl, curl, gettext, *&c.*)
 * Python 2.7
