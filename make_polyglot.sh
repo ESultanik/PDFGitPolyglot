@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if [ "$#" -ne 2 ]; then
-    (>&2 echo "Usage: $0 SOURCE_PDF OUTPUT_PDF\n")
+    (>&2 echo -e "Usage: $0 SOURCE_PDF OUTPUT_PDF\n")
     exit 1
 fi
 
@@ -27,13 +27,13 @@ BRANCH_NAME=PolyglotBranch
 
 git ls-files $OUTPUT --error-unmatch 1>/dev/null 2>&1
 if [ $? -ne 1 ]; then
-    (>&2 echo "Error: The output file $OUTPUT is already tracked by git!\n       This will not work! Please choose another output file.\n       This might happen if you just cloned this repo from a PDF polyglot.\n       If so, simply run \`git checkout master && git branch -d $BRANCH_NAME\`\n")
+    (>&2 echo -e "Error: The output file $OUTPUT is already tracked by git!\n       This will not work! Please choose another output file.\n       This might happen if you just cloned this repo from a PDF polyglot.\n       If so, simply run \`git checkout master && git branch -d $BRANCH_NAME\`\n")
     exit 4
 fi
 
 git rev-parse --verify $BRANCH_NAME 1>/dev/null 2>&1
 if [ $? -eq 0 ]; then
-    (>&2 echo "Error: A branch named $BRANCH_NAME already exists!\n       You need to either delete this branch\n       or set a different value for the BRANCH_NAME variable\n       in $0\n")
+    (>&2 echo -e "Error: A branch named $BRANCH_NAME already exists!\n       You need to either delete this branch\n       or set a different value for the BRANCH_NAME variable\n       in $0\n")
     exit 5
 fi
 
