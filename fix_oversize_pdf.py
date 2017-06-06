@@ -16,7 +16,7 @@ def parse_obj(pdf_content, logger = None):
             bytes_skipped += len(line) + 1            
             continue
         if m.group(2):
-            after_obj = pdf_content[bytes_skipped + len(m.group(1)) + 1:]
+            after_obj = pdf_content[bytes_skipped+len(m.group(1)):]
         else:
             after_obj = pdf_content[bytes_skipped+len(line)+1:]
         m = re.match(r"^\s*<<((?!\n\s*>>\s*\n).)*?\/Length\s+(\d+)\s*\n.*?>>.*?stream\n", after_obj, re.MULTILINE | re.DOTALL)
