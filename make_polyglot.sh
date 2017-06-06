@@ -5,6 +5,17 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
+# Make sure that the git username and E-mail variables are set,
+# else some of the commands below will fail:
+if [[ -z `git config --list | grep user.email | sed 's/^[^=]*=//'` ]]; then
+    (>&2 echo -e "\nYou do not have the git user.email variable set!\nPlease run \`git config --global user.email \"your@email.com\"\`\n")
+    exit 2
+fi
+if [[ -z `git config --list | grep user.name | sed 's/^[^=]*=//'` ]]; then
+    (>&2 echo -e "\nYou do not have the git user.name variable set!\nPlease run \`git config --global user.name \"Your Name\"\`\n")
+    exit 3
+fi
+
 SOURCE=$1
 OUTPUT=$2
 
